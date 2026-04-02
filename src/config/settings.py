@@ -74,9 +74,9 @@ class RetrievalConfig(BaseModel):
 class LLMConfig(BaseModel):
     """Language model provider and generation settings."""
 
-    provider: Literal["ollama", "openai", "anthropic", "litellm"] = "ollama"
-    model: str = "llama3"
-    base_url: str = "http://localhost:11434"
+    provider: Literal["groq", "ollama", "openai", "anthropic", "litellm"] = "groq"
+    model: str = "llama-3.1-8b-instant"
+    base_url: str = "https://api.groq.com/openai/v1"
     api_key: str | None = None
     temperature: float = Field(default=0.2, ge=0.0, le=2.0)
     max_tokens: int = Field(default=1024, gt=0)

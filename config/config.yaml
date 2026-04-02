@@ -112,13 +112,13 @@ retrieval:
   rerank: true
 
 llm:
-  # Provider: ollama | openai | anthropic | litellm
+  # Provider: groq | ollama | openai | anthropic | litellm
   provider: ollama
   # Model identifier for selected provider.
-  model: llama3
-  # Base URL for local provider endpoints.
-  base_url: http://localhost:11434
-  # API key for cloud providers (use null for local-only).
+  model: mistral:latest
+  # Base URL for provider endpoint.
+  base_url: http://127.0.0.1:11434
+  # API key for cloud providers (for Groq use GROQ_API_KEY).
   api_key: null
   # Sampling temperature in [0.0, 2.0].
   temperature: 0.2
