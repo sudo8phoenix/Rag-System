@@ -27,3 +27,9 @@ data/chroma_db/
 *.md
 !README.md
 !tests/**/*.md
+
+# Unit tests
+tests/unit/
+tests/conftest.py
+test
+test.*
