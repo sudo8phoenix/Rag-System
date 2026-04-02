@@ -2,13 +2,6 @@
 
 A modular Retrieval-Augmented Generation (RAG) system with voice input/output, multi-format document ingestion, chunking strategies, embeddings, retrieval, and agentic orchestration.
 
-## Phase 1 Scope
-- Core project structure and configuration
-- Voice input pipeline (VAD + STT)
-- Parsing for initial document formats
-- Chunking, embeddings, retrieval, LLM, and TTS wiring
-- Basic Gradio interface
-
 ## Project Layout
 - `src/` application source code
 - `data/` runtime data and vector stores
