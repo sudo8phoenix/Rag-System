@@ -11,7 +11,6 @@ A modular Retrieval-Augmented Generation (RAG) system with voice input/output, m
 
 ## Project Layout
 - `src/` application source code
-- `tests/` unit, integration, and e2e tests
 - `data/` runtime data and vector stores
 - `config/` YAML config and environment templates
 - `logs/` runtime logs
