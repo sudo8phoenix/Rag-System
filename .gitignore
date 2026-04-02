@@ -22,3 +22,8 @@ venv/
 # Project data and logs
 logs/*.log
 data/chroma_db/
+
+# Markdown files
+*.md
+!README.md
+!tests/**/*.md
