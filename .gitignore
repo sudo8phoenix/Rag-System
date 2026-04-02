@@ -1,0 +1,24 @@
+# Python cache and artifacts
+__pycache__/
+*.py[cod]
+*.so
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.coverage
+coverage.xml
+
+# Virtual environments
+.venv/
+venv/
+
+# Environment files
+.env
+
+# IDE and OS
+.vscode/
+.DS_Store
+
+# Project data and logs
+logs/*.log
+data/chroma_db/
