@@ -88,6 +88,26 @@ def _parse_source_paths(raw_paths: str) -> list[str]:
     return [line.strip() for line in normalized.splitlines() if line.strip()]
 
 
+def _normalize_uploaded_files(uploaded_files: Any) -> list[str]:
+    if not uploaded_files:
+        return []
+
+    if isinstance(uploaded_files, (str, Path)):
+        return [str(uploaded_files)]
+
+    normalized_paths: list[str] = []
+    for uploaded_file in uploaded_files:
+        if isinstance(uploaded_file, (str, Path)):
+            normalized_paths.append(str(uploaded_file))
+            continue
+
+        file_path = getattr(uploaded_file, "name", None)
+        if file_path:
+            normalized_paths.append(str(file_path))
+
+    return normalized_paths
+
+
 def config_to_ui_defaults(config: AppConfig) -> dict[str, Any]:
     """Map validated app config to initial UI field values."""
 
@@ -214,19 +234,23 @@ def create_gradio_app(
     def run_text_query(
         query: str,
         source_paths: str,
+        uploaded_files: Any,
         top_k: float,
     ) -> tuple[str, str | None, str, str, str]:
         query = query.strip()
         if not query:
             return "", None, "", "Please enter a query before running.", ""
 
+        resolved_source_paths = _parse_source_paths(source_paths)
+        resolved_source_paths.extend(_normalize_uploaded_files(uploaded_files))
+
         try:
             pipeline = _ensure_orchestrator()
             result = pipeline.answer(
                 query,
-                source_paths=_parse_source_paths(source_paths),
+                source_paths=resolved_source_paths,
                 top_k=_as_int(top_k),
-                ingest_sources=bool(source_paths.strip()),
+                ingest_sources=bool(resolved_source_paths),
             )
             if not result.success:
                 return (
@@ -251,18 +275,22 @@ def create_gradio_app(
 
     def run_voice_query(
         source_paths: str,
+        uploaded_files: Any,
         top_k: float,
         voice_duration_seconds: float,
     ) -> tuple[str, str | None, str, str, str]:
+        resolved_source_paths = _parse_source_paths(source_paths)
+        resolved_source_paths.extend(_normalize_uploaded_files(uploaded_files))
+
         try:
             pipeline = _ensure_orchestrator()
             result = pipeline.answer(
                 query=None,
                 use_voice=True,
                 voice_duration_seconds=float(voice_duration_seconds),
-                source_paths=_parse_source_paths(source_paths),
+                source_paths=resolved_source_paths,
                 top_k=_as_int(top_k),
-                ingest_sources=bool(source_paths.strip()),
+                ingest_sources=bool(resolved_source_paths),
             )
             if not result.success:
                 return (
@@ -346,6 +374,11 @@ def create_gradio_app(
                         placeholder="Ask a question grounded in your source files...",
                         lines=3,
                     )
+                    uploaded_files = gr.File(
+                        label="Upload Source Files",
+                        file_count="multiple",
+                        type="filepath",
+                    )
                     source_paths_box = gr.Textbox(
                         label="Source Paths (optional)",
                         placeholder="One file path per line, or comma-separated paths",
@@ -389,7 +422,7 @@ def create_gradio_app(
 
             ask_button.click(
                 fn=run_text_query,
-                inputs=[query_box, source_paths_box, top_k_slider],
+                inputs=[query_box, source_paths_box, uploaded_files, top_k_slider],
                 outputs=[
                     response_box,
                     audio_player,
@@ -401,7 +434,7 @@ def create_gradio_app(
 
             talk_button.click(
                 fn=run_voice_query,
-                inputs=[source_paths_box, top_k_slider, voice_duration_slider],
+                inputs=[source_paths_box, uploaded_files, top_k_slider, voice_duration_slider],
                 outputs=[
                     response_box,
                     audio_player,

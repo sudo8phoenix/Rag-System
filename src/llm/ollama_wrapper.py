@@ -68,6 +68,8 @@ class OllamaStatus:
 class OllamaLLM:
     """Thin wrapper around Ollama's `/api/generate` endpoint."""
 
+    DEFAULT_TIMEOUT_SECONDS = 120.0
+
     def __init__(
         self,
         config: LLMConfig | None = None,
@@ -75,7 +77,7 @@ class OllamaLLM:
         http_get_json: HttpGetJson | None = None,
         http_post_json: HttpPostJson | None = None,
         http_post_json_stream: HttpPostJsonStream | None = None,
-        timeout_seconds: float = 30.0,
+        timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
     ) -> None:
         self.config = config or LLMConfig()
         self.base_url = self.config.base_url.rstrip("/")
