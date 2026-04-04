@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import csv
+import io
 import re
 import zipfile
 from pathlib import Path
+from typing import Any
 from xml.etree import ElementTree as ET
 
 from .base import BaseParser, ParserError
@@ -56,9 +59,10 @@ class DocxParser(BaseParser):
                 else:
                     output_lines.append(paragraph_text)
             elif tag == f"{W_NS}tbl":
-                table_lines = self._extract_table_lines(child)
+                table_data = self._extract_table_data(child, paragraph_count)
+                table_lines = table_data.get("csv_lines", [])
                 if table_lines:
-                    tables.append({"rows": table_lines, "row_count": len(table_lines)})
+                    tables.append(table_data)
                     output_lines.append(f"Table {len(tables)}:")
                     output_lines.extend(table_lines)
 
@@ -96,15 +100,44 @@ class DocxParser(BaseParser):
             return None
         return int(match.group(1))
 
-    def _extract_table_lines(self, table: ET.Element) -> list[str]:
-        table_lines: list[str] = []
+    def _extract_table_data(self, table: ET.Element, paragraph_index: int) -> dict[str, Any]:
+        rows: list[list[str]] = []
         for row in table.findall(f"./{W_NS}tr"):
             cell_texts = []
             for cell in row.findall(f"./{W_NS}tc"):
                 pieces = [node.text or "" for node in cell.findall(f".//{W_NS}t")]
                 cell_text = " ".join(piece.strip() for piece in pieces if piece.strip())
                 cell_texts.append(cell_text)
-            row_text = " | ".join(cell_texts).strip()
-            if row_text:
-                table_lines.append(row_text)
-        return table_lines
+            if any(cell_texts):
+                rows.append(cell_texts)
+
+        if not rows:
+            return {
+                "paragraph_index": paragraph_index,
+                "row_count": 0,
+                "column_count": 0,
+                "headers": [],
+                "rows": [],
+                "csv_lines": [],
+            }
+
+        width = max(len(row) for row in rows)
+        for row in rows:
+            if len(row) < width:
+                row.extend([""] * (width - len(row)))
+
+        return {
+            "paragraph_index": paragraph_index,
+            "row_count": len(rows),
+            "column_count": width,
+            "headers": rows[0],
+            "rows": rows,
+            "csv_lines": self._to_csv_lines(rows),
+        }
+
+    def _to_csv_lines(self, rows: list[list[str]]) -> list[str]:
+        stream = io.StringIO()
+        writer = csv.writer(stream)
+        for row in rows:
+            writer.writerow(row)
+        return [line for line in stream.getvalue().splitlines() if line.strip()]

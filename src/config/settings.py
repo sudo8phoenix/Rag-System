@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class VoiceConfig(BaseModel):
@@ -26,13 +26,36 @@ class FormatChunkingConfig(BaseModel):
     model_config = ConfigDict(extra="allow")
 
     strategy: str | None = None
-    chunk_size: int | None = Field(default=None, gt=0)
-    chunk_overlap: int | None = Field(default=None, ge=0)
-    chunk_unit: Literal["characters", "tokens"] | None = None
+    chunk_size: int | None = Field(
+        default=None,
+        gt=0,
+        validation_alias=AliasChoices("chunk_size", "size"),
+    )
+    chunk_overlap: int | None = Field(
+        default=None,
+        ge=0,
+        validation_alias=AliasChoices("chunk_overlap", "overlap"),
+    )
+    chunk_unit: Literal["characters", "tokens"] | None = Field(
+        default=None,
+        validation_alias=AliasChoices("chunk_unit", "unit"),
+    )
+
+    @model_validator(mode="after")
+    def validate_size_bounds(self) -> "FormatChunkingConfig":
+        if (
+            self.chunk_size is not None
+            and self.chunk_overlap is not None
+            and self.chunk_overlap >= self.chunk_size
+        ):
+            raise ValueError("chunk_overlap must be smaller than chunk_size")
+        return self
 
 
 class ChunkingConfig(BaseModel):
     """Chunking strategy and limits."""
+
+    model_config = ConfigDict(extra="allow")
 
     strategy: str = "paragraph"
     chunk_size: int = Field(default=500, gt=0)
@@ -42,7 +65,32 @@ class ChunkingConfig(BaseModel):
     max_chunk_size: int = Field(default=2048, gt=0)
     respect_sentence_boundaries: bool = True
     prepend_metadata: bool = True
+    heading_levels: list[int] = Field(default_factory=lambda: [1, 2, 3])
+    rows_per_chunk: int = Field(default=50, gt=0)
+    include_headers: bool = True
+    include_notes: bool = True
+    target_tags: list[str] = Field(default_factory=list)
     per_format: dict[str, FormatChunkingConfig] = Field(default_factory=dict)
+
+    @field_validator("per_format", mode="before")
+    @classmethod
+    def normalize_per_format_keys(
+        cls,
+        value: Any,
+    ) -> Any:
+        if value is None:
+            return {}
+        if not isinstance(value, dict):
+            return value
+
+        normalized: dict[Any, Any] = {}
+        for key, config in value.items():
+            if not isinstance(key, str):
+                normalized[key] = config
+                continue
+            normalized[key.strip().lower().lstrip(".")] = config
+
+        return normalized
 
     @model_validator(mode="after")
     def validate_size_bounds(self) -> "ChunkingConfig":
@@ -51,6 +99,28 @@ class ChunkingConfig(BaseModel):
         if self.min_chunk_size > self.max_chunk_size:
             raise ValueError("min_chunk_size must be less than or equal to max_chunk_size")
         return self
+
+    def effective_for_format(self, source_type: str | None) -> "ChunkingConfig":
+        """Return a config merged with per-format overrides for a source type."""
+
+        override = self._resolve_per_format_override(source_type)
+        if override is None:
+            return self
+
+        payload = self.model_dump()
+        payload.update(override.model_dump(exclude_none=True))
+        payload["per_format"] = self.per_format
+        return ChunkingConfig.model_validate(payload)
+
+    def _resolve_per_format_override(
+        self,
+        source_type: str | None,
+    ) -> FormatChunkingConfig | None:
+        if not source_type:
+            return None
+
+        normalized = source_type.strip().lower().lstrip(".")
+        return self.per_format.get(normalized)
 
 
 class EmbeddingConfig(BaseModel):

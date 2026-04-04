@@ -21,7 +21,9 @@ venv/
 
 # Project data and logs
 logs/*.log
+data/
 data/chroma_db/
+data/tts/*.wav
 
 # Markdown files
 *.md
@@ -29,7 +31,4 @@ data/chroma_db/
 !tests/**/*.md
 
 # Unit tests
-tests/unit/
-tests/conftest.py
-test
-test.*
+tests/

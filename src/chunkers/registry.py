@@ -2,16 +2,20 @@
 
 from __future__ import annotations
 
-from typing import Any
-
 from src.config.settings import AppConfig, ChunkingConfig
 from src.models.chunk import Chunk
 from src.models.document import Document
 
 from .base import BaseChunker
 from .character_based import CharacterBasedChunker
+from .chapter_based import ChapterBasedChunker
+from .heading_hierarchy import HeadingHierarchyChunker
 from .line_based import LineBasedChunker
+from .array_item import ArrayItemChunker
 from .paragraph_based import ParagraphBasedChunker
+from .row_based import RowBasedChunker
+from .slide_based import SlideBasedChunker
+from .tag_based import TagBasedChunker
 
 
 def _normalize_strategy(strategy: str | None) -> str:
@@ -21,12 +25,27 @@ def _normalize_strategy(strategy: str | None) -> str:
     normalized = strategy.strip().lower().replace("-", "_")
     alias_map = {
         "line_based": "line",
+        "line_per_chunk": "line",
         "line": "line",
         "character_based": "character",
         "char": "character",
         "character": "character",
         "paragraph_based": "paragraph",
+        "main_content": "paragraph",
         "paragraph": "paragraph",
+        "heading_hierarchy": "heading_hierarchy",
+        "header_based": "heading_hierarchy",
+        "heading": "heading_hierarchy",
+        "row_based": "row_based",
+        "rows": "row_based",
+        "array_item": "array_item",
+        "array": "array_item",
+        "slide_based": "slide_based",
+        "slide": "slide_based",
+        "tag_based": "tag_based",
+        "tag": "tag_based",
+        "chapter_based": "chapter_based",
+        "chapter": "chapter_based",
     }
     return alias_map.get(normalized, normalized)
 
@@ -44,6 +63,12 @@ class ChunkingRegistry:
             "line": LineBasedChunker(),
             "character": CharacterBasedChunker(),
             "paragraph": ParagraphBasedChunker(),
+            "heading_hierarchy": HeadingHierarchyChunker(),
+            "row_based": RowBasedChunker(),
+            "array_item": ArrayItemChunker(),
+            "slide_based": SlideBasedChunker(),
+            "tag_based": TagBasedChunker(),
+            "chapter_based": ChapterBasedChunker(),
         }
 
     @property
@@ -56,35 +81,16 @@ class ChunkingRegistry:
 
     def chunk_document(self, document: Document) -> list[Chunk]:
         chunker = self.get_chunker(document)
-        config = self._effective_config(document)
+        config = self.config.effective_for_format(document.source_type)
         return chunker.chunk(document, config)
 
     def _selected_strategy(self, document: Document) -> str:
-        format_config = self.config.per_format.get(document.source_type)
-        if format_config is not None and format_config.strategy:
-            normalized = _normalize_strategy(format_config.strategy)
-            if normalized in self._chunkers:
-                return normalized
+        format_config = self.config.effective_for_format(document.source_type)
+        normalized = _normalize_strategy(format_config.strategy)
+        if normalized in self._chunkers:
+            return normalized
 
         return _normalize_strategy(self.config.strategy)
-
-    def _effective_config(self, document: Document) -> ChunkingConfig:
-        override = self.config.per_format.get(document.source_type)
-        if override is None:
-            return self.config
-
-        payload: dict[str, Any] = self.config.model_dump()
-        override_payload = override.model_dump(exclude_none=True)
-        for key in ("strategy", "chunk_size", "chunk_overlap", "chunk_unit"):
-            if key in override_payload:
-                payload[key] = override_payload[key]
-
-        for key, value in override_payload.items():
-            if key not in {"strategy", "chunk_size", "chunk_overlap", "chunk_unit"}:
-                payload[key] = value
-
-        payload["per_format"] = self.config.per_format
-        return ChunkingConfig.model_validate(payload)
 
 
 def get_chunker_for_document(

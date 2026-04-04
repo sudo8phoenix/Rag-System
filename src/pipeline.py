@@ -17,7 +17,7 @@ from src.llm.ollama_wrapper import OllamaLLM
 from src.models.chunk import Chunk
 from src.models.document import Document
 from src.parsers.registry import ParserRegistry
-from src.tts.pyttsx3_tts import Pyttsx3TTS
+from src.tts.orchestrator import TTSOrchestrator
 from src.voice.voice_input import VoiceInput, VoiceInputResult
 
 
@@ -62,7 +62,7 @@ class PipelineOrchestrator:
         chunking_registry: ChunkingRegistry | None = None,
         embedding_orchestrator: EmbeddingOrchestrator | None = None,
         llm: GroqLLM | None = None,
-        tts: Pyttsx3TTS | None = None,
+        tts: TTSOrchestrator | None = None,
         voice_input: VoiceInput | None = None,
         logger: logging.Logger | None = None,
     ) -> None:
@@ -73,7 +73,7 @@ class PipelineOrchestrator:
             self.config
         )
         self.llm = llm or self._build_llm_from_config(self.config)
-        self.tts = tts or Pyttsx3TTS.from_app_config(self.config)
+        self.tts = tts or TTSOrchestrator.from_app_config(self.config)
         self.voice_input = voice_input or VoiceInput()
         self.logger = logger or logging.getLogger(__name__)
 

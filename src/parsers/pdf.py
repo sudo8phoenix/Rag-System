@@ -2,13 +2,21 @@
 
 from __future__ import annotations
 
+import csv
+import io
 import re
 from pathlib import Path
+from typing import Any
 
 try:
     import fitz  # type: ignore[import-not-found]
 except ImportError:  # pragma: no cover - optional dependency
     fitz = None
+
+try:
+    import pdfplumber  # type: ignore[import-not-found]
+except ImportError:  # pragma: no cover - optional dependency
+    pdfplumber = None
 
 from .base import BaseParser, ParserError
 
@@ -29,21 +37,56 @@ class PdfParser(BaseParser):
         if not path.exists():
             raise ParserError(f"PDF file not found: {path}")
 
+        parsed_document = None
         if fitz is not None:
             try:
-                return self._parse_with_pymupdf(path)
+                parsed_document = self._parse_with_pymupdf(path)
             except Exception:
-                pass
+                parsed_document = None
 
-        raw_bytes = path.read_bytes()
-        text, metadata = self._parse_with_fallback(raw_bytes)
-        normalized = self._normalize_newlines(text).strip()
-        if not normalized:
-            raise ParserError(f"Unable to extract text from PDF: {path}")
+        if parsed_document is None:
+            raw_bytes = path.read_bytes()
+            text, metadata = self._parse_with_fallback(raw_bytes)
+            normalized = self._normalize_newlines(text).strip()
+            if not normalized:
+                raise ParserError(f"Unable to extract text from PDF: {path}")
 
-        metadata.update({"format": self.source_type})
+            metadata.update({"format": self.source_type})
+            parsed_document = self._build_document(
+                text=normalized,
+                file_path=path,
+                source_type=self.source_type,
+                metadata=metadata,
+            )
+
+        return self._enrich_with_tables(parsed_document, path)
+
+    def _enrich_with_tables(self, document, path: Path):
+        extracted_tables = self._extract_tables(path)
+        if not extracted_tables:
+            return document
+
+        table_text = self._render_tables(extracted_tables)
+        metadata = dict(document.original_metadata)
+        metadata["table_count"] = len(extracted_tables)
+        metadata["table_extraction_method"] = "pdfplumber"
+        metadata["tables"] = [
+            {
+                "page": table["page"],
+                "table_index": table["table_index"],
+                "row_count": table["row_count"],
+                "column_count": table["column_count"],
+                "bbox": table["bbox"],
+            }
+            for table in extracted_tables
+        ]
+
+        full_text = document.text
+        if table_text:
+            full_text = f"{document.text}\n\n{table_text}".strip()
+
         return self._build_document(
-            text=normalized,
+            text=full_text,
             file_path=path,
             source_type=self.source_type,
             metadata=metadata,
@@ -75,6 +118,89 @@ class PdfParser(BaseParser):
             source_type=self.source_type,
             metadata=metadata,
         )
+
+    def _extract_tables(self, path: Path) -> list[dict[str, Any]]:
+        if pdfplumber is None:
+            return []
+
+        tables: list[dict[str, Any]] = []
+        try:
+            with pdfplumber.open(str(path)) as pdf:
+                for page_number, page in enumerate(pdf.pages, start=1):
+                    for table_index, table in enumerate(page.find_tables(), start=1):
+                        rows = table.extract() or []
+                        normalized_rows = self._normalize_table_rows(rows)
+                        if not normalized_rows:
+                            continue
+
+                        bbox = table.bbox if hasattr(table, "bbox") else None
+                        tables.append(
+                            {
+                                "page": page_number,
+                                "table_index": table_index,
+                                "rows": normalized_rows,
+                                "csv_lines": self._to_csv_lines(normalized_rows),
+                                "row_count": len(normalized_rows),
+                                "column_count": max((len(row) for row in normalized_rows), default=0),
+                                "bbox": self._format_bbox(bbox),
+                            }
+                        )
+        except Exception:
+            return []
+
+        return tables
+
+    def _normalize_table_rows(self, rows: list[list[object]]) -> list[list[str]]:
+        normalized_rows: list[list[str]] = []
+        for row in rows:
+            cleaned = [("" if cell is None else str(cell).strip()) for cell in row]
+            if any(cleaned):
+                normalized_rows.append(cleaned)
+
+        if not normalized_rows:
+            return []
+
+        width = max(len(row) for row in normalized_rows)
+        for row in normalized_rows:
+            if len(row) < width:
+                row.extend([""] * (width - len(row)))
+        return normalized_rows
+
+    def _to_csv_lines(self, rows: list[list[str]]) -> list[str]:
+        stream = io.StringIO()
+        writer = csv.writer(stream)
+        for row in rows:
+            writer.writerow(row)
+        return [line for line in stream.getvalue().splitlines() if line.strip()]
+
+    def _format_bbox(self, bbox: object) -> dict[str, float] | None:
+        if not isinstance(bbox, tuple) or len(bbox) != 4:
+            return None
+        x0, top, x1, bottom = bbox
+        return {
+            "x0": float(x0),
+            "top": float(top),
+            "x1": float(x1),
+            "bottom": float(bottom),
+        }
+
+    def _render_tables(self, tables: list[dict[str, Any]]) -> str:
+        output_lines: list[str] = []
+        for table in tables:
+            page_number = table["page"]
+            table_index = table["table_index"]
+            bbox = table.get("bbox")
+            if bbox:
+                output_lines.append(
+                    "Table "
+                    f"{table_index} (page {page_number}, bbox={bbox['x0']:.1f},{bbox['top']:.1f},{bbox['x1']:.1f},{bbox['bottom']:.1f}):"
+                )
+            else:
+                output_lines.append(f"Table {table_index} (page {page_number}):")
+            output_lines.extend(table["csv_lines"])
+            output_lines.append("")
+
+        return "\n".join(self._strip_outer_whitespace(output_lines))
 
     def _parse_with_fallback(self, raw_bytes: bytes) -> tuple[str, dict[str, object]]:
         text = raw_bytes.decode("latin-1", errors="ignore")
