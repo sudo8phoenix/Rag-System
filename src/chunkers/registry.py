@@ -16,6 +16,8 @@ from .paragraph_based import ParagraphBasedChunker
 from .row_based import RowBasedChunker
 from .slide_based import SlideBasedChunker
 from .tag_based import TagBasedChunker
+from .semantic_based import SemanticBasedChunker
+from .token_based import TokenBasedChunker
 
 
 def _normalize_strategy(strategy: str | None) -> str:
@@ -46,6 +48,10 @@ def _normalize_strategy(strategy: str | None) -> str:
         "tag": "tag_based",
         "chapter_based": "chapter_based",
         "chapter": "chapter_based",
+        "semantic_based": "semantic",
+        "semantic": "semantic",
+        "token_based": "token",
+        "token": "token",
     }
     return alias_map.get(normalized, normalized)
 
@@ -69,6 +75,8 @@ class ChunkingRegistry:
             "slide_based": SlideBasedChunker(),
             "tag_based": TagBasedChunker(),
             "chapter_based": ChapterBasedChunker(),
+            "semantic": SemanticBasedChunker(),
+            "token": TokenBasedChunker(),
         }
 
     @property

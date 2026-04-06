@@ -121,6 +121,7 @@ def config_to_ui_defaults(config: AppConfig) -> dict[str, Any]:
         "vector_store": config.embedding.vector_store,
         "llm_model": config.llm.model,
         "llm_temperature": config.llm.temperature,
+        "llm_api_key": config.llm.api_key or "",
         "tts_engine": config.tts.engine,
         "tts_rate": config.tts.rate,
         "tts_volume": config.tts.volume,
@@ -138,6 +139,7 @@ def build_config_payload(
     vector_store: str,
     llm_model: str,
     llm_temperature: float,
+    llm_api_key: str,
     tts_engine: str,
     tts_rate: float,
     tts_volume: float,
@@ -155,6 +157,7 @@ def build_config_payload(
     payload["embedding"]["vector_store"] = vector_store
     payload["llm"]["model"] = llm_model.strip()
     payload["llm"]["temperature"] = float(llm_temperature)
+    payload["llm"]["api_key"] = llm_api_key.strip() if llm_api_key else None
     payload["tts"]["engine"] = tts_engine
     payload["tts"]["rate"] = float(tts_rate)
     payload["tts"]["volume"] = float(tts_volume)
@@ -262,12 +265,25 @@ def create_gradio_app(
                 )
 
             retrieved_text = _format_retrieved_chunks(result.retrieved_chunks)
+            response_text = (result.response_text or "").strip()
+            if not response_text:
+                response_text = (
+                    "The model returned an empty response. "
+                    "Please try re-running your query."
+                )
+
+            warning_suffix = ""
+            if result.ingest_errors:
+                warning_suffix = f" | ingest warnings={len(result.ingest_errors)}"
 
             return (
-                result.response_text,
+                response_text,
                 str(result.audio_path) if result.audio_path else None,
                 result.transcribed_text or "",
-                "Ready" if not retrieved_text else "Ready - retrieved context shown below",
+                (
+                    "Ready" if not retrieved_text else "Ready - retrieved context shown below"
+                )
+                + warning_suffix,
                 retrieved_text,
             )
         except Exception as exc:  # pragma: no cover - guarded by integration behavior
@@ -302,12 +318,20 @@ def create_gradio_app(
                 )
 
             retrieved_text = _format_retrieved_chunks(result.retrieved_chunks)
+            response_text = (result.response_text or "").strip()
+            if not response_text:
+                response_text = (
+                    "The model returned an empty response. "
+                    "Please try re-running your query."
+                )
             status = "Ready" if not retrieved_text else "Ready - retrieved context shown below"
             if result.voice_confidence is not None:
                 status = f"{status} | voice confidence={result.voice_confidence:.2f}"
+            if result.ingest_errors:
+                status = f"{status} | ingest warnings={len(result.ingest_errors)}"
 
             return (
-                result.response_text,
+                response_text,
                 str(result.audio_path) if result.audio_path else None,
                 result.transcribed_text or "",
                 status,
@@ -326,6 +350,7 @@ def create_gradio_app(
         vector_store: str,
         llm_model: str,
         llm_temperature: float,
+        llm_api_key: str,
         tts_engine: str,
         tts_rate: float,
         tts_volume: float,
@@ -340,6 +365,7 @@ def create_gradio_app(
             vector_store=vector_store,
             llm_model=llm_model,
             llm_temperature=llm_temperature,
+            llm_api_key=llm_api_key,
             tts_engine=tts_engine,
             tts_rate=tts_rate,
             tts_volume=tts_volume,
@@ -489,6 +515,12 @@ def create_gradio_app(
                         step=0.05,
                         value=defaults["llm_temperature"],
                     )
+                    llm_api_key = gr.Textbox(
+                        label="Groq API Key",
+                        value=defaults["llm_api_key"],
+                        type="password",
+                        placeholder="Enter your Groq API key (will be saved to config.yaml)",
+                    )
                     tts_engine = gr.Dropdown(
                         label="TTS Engine",
                         choices=TTS_ENGINE_CHOICES,
@@ -524,6 +556,7 @@ def create_gradio_app(
                     vector_store,
                     llm_model,
                     llm_temperature,
+                    llm_api_key,
                     tts_engine,
                     tts_rate,
                     tts_volume,

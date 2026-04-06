@@ -318,32 +318,55 @@ class PipelineOrchestrator:
                 error_message=str(exc),
             )
 
+        response_text = llm_response.text.strip()
+        if not response_text:
+            response_text = (
+                "The language model returned an empty response. "
+                "Please try again or adjust your query/context."
+            )
+            self._log_event(
+                logging.WARNING,
+                "llm",
+                "empty response normalized",
+                model=llm_response.model,
+                query=resolved_query,
+            )
+
         audio_path: Path | None = None
         audio_played = False
-        try:
-            tts_result = self.tts.speak(llm_response.text, output_path=output_path, block=block)
-            audio_path = tts_result.audio_path
-            audio_played = tts_result.played
+        mute_enabled = self.config.tts.mute and isinstance(self.tts, TTSOrchestrator)
+        if mute_enabled:
             self._log_event(
                 logging.INFO,
                 "tts",
-                "audio synthesized",
-                audio_path=str(audio_path),
-                played=audio_played,
-            )
-        except Exception as exc:
-            self._log_event(
-                logging.WARNING,
-                "tts",
-                "audio synthesis skipped",
+                "audio synthesis skipped (mute enabled)",
                 query=resolved_query,
-                error=str(exc),
-                type=type(exc).__name__,
             )
+        else:
+            try:
+                tts_result = self.tts.speak(response_text, output_path=output_path, block=block)
+                audio_path = tts_result.audio_path
+                audio_played = tts_result.played
+                self._log_event(
+                    logging.INFO,
+                    "tts",
+                    "audio synthesized",
+                    audio_path=str(audio_path),
+                    played=audio_played,
+                )
+            except Exception as exc:
+                self._log_event(
+                    logging.WARNING,
+                    "tts",
+                    "audio synthesis skipped",
+                    query=resolved_query,
+                    error=str(exc),
+                    type=type(exc).__name__,
+                )
 
         return PipelineResult(
             query=resolved_query,
-            response_text=llm_response.text,
+            response_text=response_text,
             audio_path=audio_path,
             audio_played=audio_played,
             transcribed_text=voice_result.text if voice_result else None,

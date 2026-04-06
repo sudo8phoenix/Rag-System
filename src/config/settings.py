@@ -70,6 +70,7 @@ class ChunkingConfig(BaseModel):
     include_headers: bool = True
     include_notes: bool = True
     target_tags: list[str] = Field(default_factory=list)
+    semantic_similarity_threshold: float = Field(default=0.5, ge=0.0, le=1.0)
     per_format: dict[str, FormatChunkingConfig] = Field(default_factory=dict)
 
     @field_validator("per_format", mode="before")
@@ -126,7 +127,7 @@ class ChunkingConfig(BaseModel):
 class EmbeddingConfig(BaseModel):
     """Embedding and vector store configuration."""
 
-    model: str = "BAAI/bge-m3"
+    model: Literal["BAAI/bge-m3", "nomic-embed-text"] = "BAAI/bge-m3"
     device: Literal["cpu", "cuda"] = "cpu"
     vector_store: Literal["faiss", "chroma", "qdrant"] = "chroma"
     chroma_path: str = "./data/chroma_db"

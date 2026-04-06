@@ -1,13 +1,13 @@
-"""Groq LLM wrapper with endpoint checks and streaming support."""
+"""Groq LLM wrapper with robust response parsing and streaming support."""
 
 from __future__ import annotations
 
 import json
 import os
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Sequence
+from typing import Any, Callable
 from urllib import error, request
 
 from src.config.settings import AppConfig, LLMConfig
@@ -15,14 +15,24 @@ from src.config.settings import AppConfig, LLMConfig
 from .base import LLMConnectionError, LLMProviderError, LLMResponse, LLMStreamToken
 from .prompting import build_user_prompt
 
+try:
+    from openai import OpenAI
+except ImportError:  # pragma: no cover - optional dependency at import time
+    OpenAI = None  # type: ignore[assignment]
+
 JSONDict = dict[str, Any]
 HttpGetJson = Callable[[str, dict[str, str], float], JSONDict]
 HttpPostJson = Callable[[str, JSONDict, dict[str, str], float], JSONDict]
 HttpPostJsonStream = Callable[[str, JSONDict, dict[str, str], float], Iterator[JSONDict]]
 
+EMPTY_RESPONSE_FALLBACK = (
+    "I could not generate a response for that request. "
+    "Please try again with more context or a more specific question."
+)
+
 
 def _read_env_file_value(key: str) -> str | None:
-    """Read a single key from the project's .env file if present."""
+    """Read a single key from the project .env file if present."""
 
     project_root = Path(__file__).resolve().parents[2]
     env_path = project_root / ".env"
@@ -94,7 +104,7 @@ class GroqStatus:
 
 
 class GroqLLM:
-    """Thin wrapper around Groq's OpenAI-compatible chat completions API."""
+    """Thin wrapper around Groq's OpenAI-compatible endpoints."""
 
     def __init__(
         self,
@@ -111,12 +121,16 @@ class GroqLLM:
         self._http_get_json = http_get_json or _http_get_json
         self._http_post_json = http_post_json or _http_post_json
         self._http_post_json_stream = http_post_json_stream or _http_post_json_stream
+        self._has_custom_http = any(
+            item is not None for item in (http_get_json, http_post_json, http_post_json_stream)
+        )
+        self._openai_client: OpenAI | None = None
 
     @classmethod
     def from_app_config(cls, config: AppConfig) -> "GroqLLM":
         return cls(config=config.llm)
 
-    def _headers(self) -> dict[str, str]:
+    def _resolve_api_key(self) -> str:
         api_key = (
             self.config.api_key
             or os.getenv("GROQ_API_KEY")
@@ -126,38 +140,74 @@ class GroqLLM:
             raise LLMConnectionError(
                 "Missing API key for Groq. Set llm.api_key in config or export GROQ_API_KEY."
             )
+        return api_key
+
+    def _headers(self) -> dict[str, str]:
+        api_key = self._resolve_api_key()
         return {
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
         }
 
-    def _get(self, endpoint: str) -> JSONDict:
-        url = f"{self.base_url}{endpoint}"
-        try:
-            return self._http_get_json(url, self._headers(), self.timeout_seconds)
-        except error.HTTPError as exc:
-            raise LLMConnectionError(self._format_http_error(exc, endpoint)) from exc
-        except (error.URLError, TimeoutError, OSError, json.JSONDecodeError) as exc:
-            raise LLMConnectionError(
-                f"Unable to connect to Groq at {self.base_url}. "
-                "Verify network access and API key."
-            ) from exc
+    def _use_openai_sdk(self) -> bool:
+        return OpenAI is not None and not self._has_custom_http
 
-    def _format_http_error(self, exc: error.HTTPError, endpoint: str) -> str:
+    def _client(self) -> OpenAI:
+        if not self._use_openai_sdk() or OpenAI is None:
+            raise LLMProviderError(
+                "OpenAI SDK is unavailable for Groq client mode. "
+                "Install package openai or use HTTP fallback."
+            )
+
+        if self._openai_client is None:
+            self._openai_client = OpenAI(
+                api_key=self._resolve_api_key(),
+                base_url=self.base_url,
+                timeout=self.timeout_seconds,
+            )
+        return self._openai_client
+
+    def _format_openai_error(self, exc: Exception, endpoint: str) -> str:
+        status_code = getattr(exc, "status_code", None)
+        message = str(exc).strip()
+
+        if status_code in {401, 403}:
+            guidance = (
+                "Groq authentication/authorization failed. "
+                "Check GROQ_API_KEY, model access permissions, and account limits."
+            )
+            return f"Groq request failed for {endpoint}: HTTP {status_code}. {guidance}" + (
+                f" Detail: {message}" if message else ""
+            )
+
+        if status_code is not None:
+            return f"Groq request failed for {endpoint}: HTTP {status_code}" + (
+                f". Detail: {message}" if message else ""
+            )
+
+        return f"Groq request failed for {endpoint}: {message or type(exc).__name__}"
+
+    def _extract_http_error_detail(self, exc: error.HTTPError) -> str:
         detail = ""
         try:
             body = exc.read().decode("utf-8")
-            if body:
-                parsed = json.loads(body)
-                if isinstance(parsed, dict):
-                    if isinstance(parsed.get("error"), dict):
-                        detail = str(parsed["error"].get("message", "")).strip()
-                    elif parsed.get("error"):
-                        detail = str(parsed["error"]).strip()
-                    elif parsed.get("message"):
-                        detail = str(parsed["message"]).strip()
+            if not body:
+                return ""
+            parsed = json.loads(body)
+            if not isinstance(parsed, dict):
+                return ""
+            if isinstance(parsed.get("error"), dict):
+                detail = str(parsed["error"].get("message", "")).strip()
+            elif parsed.get("error"):
+                detail = str(parsed["error"]).strip()
+            elif parsed.get("message"):
+                detail = str(parsed["message"]).strip()
         except Exception:
-            detail = ""
+            return ""
+        return detail
+
+    def _format_http_error(self, exc: error.HTTPError, endpoint: str) -> str:
+        detail = self._extract_http_error_detail(exc)
 
         if exc.code in {401, 403}:
             guidance = (
@@ -171,6 +221,18 @@ class GroqLLM:
         return f"Groq request failed for {endpoint}: HTTP {exc.code}" + (
             f". Detail: {detail}" if detail else ""
         )
+
+    def _get(self, endpoint: str) -> JSONDict:
+        url = f"{self.base_url}{endpoint}"
+        try:
+            return self._http_get_json(url, self._headers(), self.timeout_seconds)
+        except error.HTTPError as exc:
+            raise LLMConnectionError(self._format_http_error(exc, endpoint)) from exc
+        except (error.URLError, TimeoutError, OSError, json.JSONDecodeError) as exc:
+            raise LLMConnectionError(
+                f"Unable to connect to Groq at {self.base_url}. "
+                "Verify network access and API key."
+            ) from exc
 
     def _post(self, endpoint: str, payload: JSONDict) -> JSONDict:
         url = f"{self.base_url}{endpoint}"
@@ -199,39 +261,6 @@ class GroqLLM:
         except (error.URLError, TimeoutError, OSError, json.JSONDecodeError) as exc:
             raise LLMProviderError(f"Groq streaming request failed for {endpoint}: {exc}") from exc
 
-    def list_models(self) -> list[str]:
-        """Return available Groq model names."""
-
-        response = self._get("/models")
-        models = response.get("data", [])
-        names: list[str] = []
-        for model in models:
-            if isinstance(model, dict) and isinstance(model.get("id"), str):
-                names.append(model["id"])
-        return names
-
-    def check_status(self) -> GroqStatus:
-        """Check endpoint reachability and whether configured model is available."""
-
-        names = self.list_models()
-        return GroqStatus(
-            api_reachable=True,
-            model_available=self.config.model in names,
-            available_models=names,
-        )
-
-    def verify_ready(self) -> GroqStatus:
-        """Ensure Groq endpoint is reachable and target model is available."""
-
-        status = self.check_status()
-        if status.model_available:
-            return status
-
-        raise LLMConnectionError(
-            "Configured model is not available on Groq account. "
-            f"Requested model: {self.config.model}."
-        )
-
     def _build_payload(
         self,
         query: str,
@@ -255,6 +284,71 @@ class GroqLLM:
             "stream": stream,
         }
 
+    def _extract_text_from_message_content(self, content: Any) -> str:
+        if isinstance(content, str):
+            return content.strip()
+
+        if isinstance(content, list):
+            parts: list[str] = []
+            for block in content:
+                if not isinstance(block, dict):
+                    continue
+                text = block.get("text")
+                if isinstance(text, str) and text.strip():
+                    parts.append(text)
+            return "".join(parts).strip()
+
+        return ""
+
+    def _normalize_response_text(self, text: str) -> str:
+        cleaned = text.strip()
+        return cleaned if cleaned else EMPTY_RESPONSE_FALLBACK
+
+    def list_models(self) -> list[str]:
+        """Return available Groq model names."""
+
+        if self._use_openai_sdk():
+            try:
+                response = self._client().models.list()
+            except Exception as exc:
+                raise LLMConnectionError(self._format_openai_error(exc, "/models")) from exc
+
+            model_names: list[str] = []
+            for model in getattr(response, "data", []):
+                model_id = getattr(model, "id", None)
+                if isinstance(model_id, str):
+                    model_names.append(model_id)
+            return model_names
+
+        response = self._get("/models")
+        model_names: list[str] = []
+        for model in response.get("data", []):
+            if isinstance(model, dict) and isinstance(model.get("id"), str):
+                model_names.append(model["id"])
+        return model_names
+
+    def check_status(self) -> GroqStatus:
+        """Check endpoint reachability and whether configured model is available."""
+
+        model_names = self.list_models()
+        return GroqStatus(
+            api_reachable=True,
+            model_available=self.config.model in model_names,
+            available_models=model_names,
+        )
+
+    def verify_ready(self) -> GroqStatus:
+        """Ensure Groq endpoint is reachable and target model is available."""
+
+        status = self.check_status()
+        if status.model_available:
+            return status
+
+        raise LLMConnectionError(
+            "Configured model is not available on Groq account. "
+            f"Requested model: {self.config.model}."
+        )
+
     def generate(
         self,
         query: str,
@@ -270,15 +364,47 @@ class GroqLLM:
             system_prompt=system_prompt,
             stream=False,
         )
+
+        if self._use_openai_sdk():
+            try:
+                result = self._client().chat.completions.create(
+                    model=self.config.model,
+                    messages=payload["messages"],
+                    temperature=self.config.temperature,
+                    max_tokens=self.config.max_tokens,
+                )
+            except TypeError:
+                result = self._client().chat.completions.create(
+                    model=self.config.model,
+                    messages=payload["messages"],
+                )
+            except Exception as exc:
+                raise LLMProviderError(self._format_openai_error(exc, "/chat/completions")) from exc
+
+            choices = getattr(result, "choices", [])
+            first_choice = choices[0] if choices else None
+            message = getattr(first_choice, "message", None)
+            content = getattr(message, "content", "")
+            text = self._extract_text_from_message_content(content)
+
+            raw = result.model_dump() if hasattr(result, "model_dump") else {}
+            return LLMResponse(
+                text=self._normalize_response_text(text),
+                model=str(getattr(result, "model", self.config.model)),
+                prompt=str(payload["messages"][1]["content"]),
+                done_reason=str(getattr(first_choice, "finish_reason", "") or "") or None,
+                raw=raw,
+            )
+
         result = self._post("/chat/completions", payload)
 
         choices = result.get("choices", [])
         first_choice = choices[0] if choices else {}
         message = first_choice.get("message", {}) if isinstance(first_choice, dict) else {}
-        text = str(message.get("content", "")).strip()
+        text = self._extract_text_from_message_content(message.get("content", ""))
 
         return LLMResponse(
-            text=text,
+            text=self._normalize_response_text(text),
             model=str(result.get("model", self.config.model)),
             prompt=str(payload["messages"][1]["content"]),
             done_reason=(
@@ -305,6 +431,7 @@ class GroqLLM:
             stream=True,
         )
 
+        emitted_token = False
         for event in self._post_stream("/chat/completions", payload):
             choices = event.get("choices", [])
             first_choice = choices[0] if choices else {}
@@ -316,5 +443,13 @@ class GroqLLM:
             )
             done = done_reason is not None
 
-            if token or done:
-                yield LLMStreamToken(token=token, done=done)
+            if token:
+                emitted_token = True
+                yield LLMStreamToken(token=token, done=False)
+            elif done and emitted_token:
+                yield LLMStreamToken(token="", done=True)
+
+        if not emitted_token:
+            # Ensure downstream UI receives at least one visible chunk.
+            yield LLMStreamToken(token=EMPTY_RESPONSE_FALLBACK, done=False)
+            yield LLMStreamToken(token="", done=True)

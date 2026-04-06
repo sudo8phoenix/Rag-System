@@ -10,6 +10,8 @@ from .paragraph_based import ParagraphBasedChunker
 from .row_based import RowBasedChunker
 from .slide_based import SlideBasedChunker
 from .tag_based import TagBasedChunker
+from .semantic_based import SemanticBasedChunker
+from .token_based import TokenBasedChunker
 from .registry import ChunkingRegistry, chunk_document, get_chunker_for_document
 
 __all__ = [
@@ -24,6 +26,8 @@ __all__ = [
     "SlideBasedChunker",
     "TagBasedChunker",
     "ChapterBasedChunker",
+    "SemanticBasedChunker",
+    "TokenBasedChunker",
     "ChunkingRegistry",
     "chunk_document",
     "get_chunker_for_document",

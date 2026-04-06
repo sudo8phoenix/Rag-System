@@ -1,164 +1,182 @@
-# Voice-Based Agentic RAG System default configuration
-# Docs: README.md (quick start) and PRD/tech specs in project root for full explanations.
-
 voice:
-  # STT backend: faster-whisper | whisper | speechrecognition
   stt_engine: faster-whisper
-  # Whisper model size: tiny | base | small | medium | large
   whisper_model: base
-  # Enable voice activity detection before STT.
   vad_enabled: true
-  # Speech detection confidence threshold in [0.0, 1.0].
   vad_threshold: 0.5
-  # Language code for transcription (for example: en, fr, es).
   language: en
-  # Input mode: voice | text
-  input_mode: voice
-
+  input_mode: text
 chunking:
-  # Global chunking strategy fallback.
-  # Common values: line | paragraph | sentence | token | semantic | sliding_window | recursive
   strategy: paragraph
-  # Base chunk size in chunk_unit.
   chunk_size: 500
-  # Overlap between adjacent chunks in chunk_unit.
   chunk_overlap: 50
-  # Unit used for chunk_size/chunk_overlap: characters | tokens
   chunk_unit: characters
-  # Minimum size below which chunks are discarded.
   min_chunk_size: 30
-  # Hard upper bound for chunk size.
   max_chunk_size: 2048
-  # Keep sentence boundaries intact where possible.
   respect_sentence_boundaries: true
-  # Prepend source metadata inside chunk text.
   prepend_metadata: true
-
-  # Optional per-format strategy overrides.
+  heading_levels:
+  - 1
+  - 2
+  - 3
+  rows_per_chunk: 50
+  include_headers: true
+  include_notes: true
+  target_tags: []
+  semantic_similarity_threshold: 0.5
   per_format:
     txt:
       strategy: paragraph
+      chunk_size: null
+      chunk_overlap: null
+      chunk_unit: null
     md:
       strategy: header_based
+      chunk_size: null
+      chunk_overlap: null
+      chunk_unit: null
       split_code_blocks: false
     docx:
       strategy: heading_hierarchy
+      chunk_size: null
+      chunk_overlap: null
+      chunk_unit: null
       include_tables: true
-      heading_levels: [1, 2, 3]
+      heading_levels:
+      - 1
+      - 2
+      - 3
     doc:
-      convert_first: true
       strategy: heading_hierarchy
+      chunk_size: null
+      chunk_overlap: null
+      chunk_unit: null
+      convert_first: true
     pdf:
       strategy: paragraph
+      chunk_size: null
+      chunk_overlap: null
+      chunk_unit: null
       extract_tables: true
       table_as_single_chunk: true
     xlsx:
       strategy: row_based
+      chunk_size: null
+      chunk_overlap: null
+      chunk_unit: null
       rows_per_chunk: 20
       include_headers: true
       sheets: all
     xls:
-      convert_first: true
       strategy: row_based
+      chunk_size: null
+      chunk_overlap: null
+      chunk_unit: null
+      convert_first: true
     csv:
       strategy: row_based
+      chunk_size: null
+      chunk_overlap: null
+      chunk_unit: null
       rows_per_chunk: 50
-      delimiter: ","
+      delimiter: ','
     tsv:
       strategy: row_based
+      chunk_size: null
+      chunk_overlap: null
+      chunk_unit: null
       rows_per_chunk: 50
       delimiter: "\t"
     json:
       strategy: array_item
+      chunk_size: null
+      chunk_overlap: null
+      chunk_unit: null
       depth: 3
     jsonl:
       strategy: line_per_chunk
+      chunk_size: null
+      chunk_overlap: null
+      chunk_unit: null
     xml:
       strategy: tag_based
-      target_tags: [record, item, entry]
+      chunk_size: null
+      chunk_overlap: null
+      chunk_unit: null
+      target_tags:
+      - record
+      - item
+      - entry
     html:
       strategy: main_content
+      chunk_size: null
+      chunk_overlap: null
+      chunk_unit: null
       extract_tables: true
     epub:
       strategy: chapter_based
+      chunk_size: null
+      chunk_overlap: null
+      chunk_unit: null
     pptx:
       strategy: slide_based
+      chunk_size: null
+      chunk_overlap: null
+      chunk_unit: null
       include_notes: true
     ppt:
-      convert_first: true
       strategy: slide_based
-    odt:
+      chunk_size: null
+      chunk_overlap: null
+      chunk_unit: null
       convert_first: true
+    odt:
       strategy: heading_hierarchy
-
+      chunk_size: null
+      chunk_overlap: null
+      chunk_unit: null
+      convert_first: true
 embedding:
-  # Embedding model name (sentence-transformers or Ollama embedding model).
   model: BAAI/bge-m3
-  # Device: cpu | cuda
   device: cpu
-  # Vector backend: faiss | chroma | qdrant
   vector_store: chroma
-  # Persistent path used by Chroma.
   chroma_path: ./data/chroma_db
-
 retrieval:
-  # Number of chunks returned to the generation stage.
   top_k: 5
-  # Enable dense+sparse hybrid retrieval.
   hybrid_search: false
-  # BM25 score weight when hybrid_search=true (0.0..1.0).
   bm25_weight: 0.3
-  # Apply cross-encoder reranking to final candidates.
   rerank: true
-
 llm:
-  # Provider: groq | ollama | openai | anthropic | litellm
   provider: ollama
-  # Model identifier for selected provider.
-  model: mistral:latest
-  # Base URL for provider endpoint.
+  model: mistral
   base_url: http://127.0.0.1:11434
-  # API key for cloud providers (for Groq use GROQ_API_KEY).
   api_key: null
-  # Sampling temperature in [0.0, 2.0].
   temperature: 0.2
-  # Maximum tokens in model response.
   max_tokens: 1024
-  # System prompt used for grounding behavior.
-  system_prompt: |
-    You are a helpful assistant. Answer only from the provided context.
-    If you don't know, say so clearly.
+  system_prompt: 'You are a helpful assistant. Answer only from the provided context.
 
+    If you don''t know, say so clearly.
+
+    '
 agent:
-  # Enable or disable the agentic reasoning loop.
   enabled: true
-  # Maximum Think->Act->Observe cycles per query.
   max_iterations: 6
-  # Number of conversation turns retained in short-term memory.
   memory_turns: 10
-  # Registered tools available to the agent.
-  tools: [pdf_loader, excel_reader, json_parser, vector_search, calculator, datetime]
-
+  tools:
+  - pdf_loader
+  - excel_reader
+  - json_parser
+  - vector_search
+  - calculator
+  - datetime
 tts:
-  # Engine: pyttsx3 | gtts | kokoro | bark | elevenlabs
   engine: pyttsx3
-  # Voice profile name or ID depending on engine.
   voice: male
-  # Playback speed multiplier (>0).
   rate: 1.0
-  # Playback volume [0.0, 1.0].
   volume: 1.0
-  # True disables speech output.
-  mute: false
-
+  mute: true
 ui:
-  # Frontend mode: gradio | streamlit | cli
   mode: gradio
-  # Bind host for local web server.
   host: 127.0.0.1
-  # Port for local web server.
   port: 7860
-  # Show retrieved source chunks in UI.
   show_sources: true
-  # Show agent reasoning trace in UI.
   show_agent_trace: false
