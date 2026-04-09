@@ -2,11 +2,6 @@
 
 A modular Retrieval-Augmented Generation (RAG) system with voice input and output, multi-format document ingestion, configurable chunking, semantic retrieval, and local-first runtime options.
 
-## Status
-
-- Phase 1 to Phase 3 are implemented and validated in tests.
-- Phase 4 (advanced LangGraph agent loop and dynamic tool routing) is planned next.
-
 ## Core Capabilities
 
 - Voice input pipeline with configurable STT engines:
@@ -159,20 +154,6 @@ print(result.response_text)
 print(result.success)
 ```
 
-## Testing
-
-Run all tests:
-
-```bash
-pytest -q
-```
-
-Run targeted suites:
-
-```bash
-pytest tests/unit/chunkers -q
-pytest tests/unit/embeddings -q
-pytest tests/integration -q
 ```
 
 ## Current Milestone Summary
