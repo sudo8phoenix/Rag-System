@@ -10,7 +10,7 @@ from src.config.settings import AppConfig, TTSConfig
 from .base import BaseTTSBackend, TTSBackendError, TTSDependencyError
 
 
-def _default_gtts_factory() -> Any:
+def _default_gtts_factory(*args: Any, **kwargs: Any) -> Any:
     try:
         from gtts import gTTS
     except ImportError as exc:  # pragma: no cover - exercised when dependency exists
@@ -18,7 +18,7 @@ def _default_gtts_factory() -> Any:
             "gTTS is not installed. Add it to requirements and reinstall dependencies."
         ) from exc
 
-    return gTTS
+    return gTTS(*args, **kwargs)
 
 
 class GTTSTTS(BaseTTSBackend):

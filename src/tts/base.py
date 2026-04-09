@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import shutil
+import subprocess
+import sys
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
@@ -109,7 +112,38 @@ class BaseTTSBackend(ABC):
                 while mixer.music.get_busy():
                     time.sleep(0.05)
         except Exception as exc:  # pragma: no cover - backend specific
+            if self._play_audio_with_system_player(audio_path, block=block):
+                return
             raise TTSPlaybackError(f"Unable to play audio {audio_path}: {exc}") from exc
+
+    def _play_audio_with_system_player(self, audio_path: str | Path, *, block: bool) -> bool:
+        """Fallback to OS-native audio playback when pygame cannot decode the file."""
+        if sys.platform != "darwin":
+            return False
+
+        afplay_path = shutil.which("afplay")
+        if not afplay_path:
+            return False
+
+        command = [afplay_path, str(audio_path)]
+        try:
+            if block:
+                subprocess.run(
+                    command,
+                    check=True,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+            else:
+                subprocess.Popen(
+                    command,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+        except Exception:
+            return False
+
+        return True
 
     def speak(
         self,

@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import subprocess
+import sys
+import time
+import wave
 from pathlib import Path
 from typing import Any, Callable
 
@@ -9,6 +13,7 @@ from src.config.settings import AppConfig, TTSConfig
 
 from .base import (
     BaseTTSBackend,
+    TTSBackendError,
     TTSConfigurationError,
     TTSDependencyError,
     TTSPlaybackError,
@@ -67,9 +72,13 @@ class Pyttsx3TTS(BaseTTSBackend):
         if self._engine is not None:
             return self._engine
 
+        engine = self._create_configured_engine()
+        self._engine = engine
+        return engine
+
+    def _create_configured_engine(self) -> Any:
         engine = self._engine_factory()
         self._configure_engine(engine)
-        self._engine = engine
         return engine
 
     def _configure_engine(self, engine: Any) -> None:
@@ -123,14 +132,71 @@ class Pyttsx3TTS(BaseTTSBackend):
 
         return None
 
+    def _looks_like_aiff(self, path: Path) -> bool:
+        """Detect AIFF/AIFC container bytes, even when file extension is .wav."""
+        try:
+            header = path.read_bytes()[:12]
+        except OSError:
+            return False
+
+        return len(header) >= 12 and header[:4] == b"FORM" and header[8:12] in {
+            b"AIFF",
+            b"AIFC",
+        }
+
+    def _convert_aiff_to_wav(self, path: Path) -> None:
+        """Use macOS afconvert to produce a browser-decodable PCM WAV file."""
+        if sys.platform != "darwin":
+            return
+        if path.suffix.lower() != ".wav":
+            return
+        if not self._looks_like_aiff(path):
+            return
+
+        converted = path.with_suffix(".converted.wav")
+        try:
+            subprocess.run(
+                ["afconvert", "-f", "WAVE", "-d", "LEI16", str(path), str(converted)],
+                check=True,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            converted.replace(path)
+        except Exception:
+            if converted.exists():
+                converted.unlink(missing_ok=True)
+
+    def _is_audio_file_usable(self, path: Path) -> bool:
+        """Validate that synthesized output has audio payload, not just a header."""
+        if not path.exists() or path.stat().st_size == 0:
+            return False
+
+        if path.suffix.lower() != ".wav":
+            return True
+
+        try:
+            with wave.open(str(path), "rb") as handle:
+                return handle.getnframes() > 0
+        except wave.Error:
+            return True
+
     def synthesize_to_file(self, text: str, output_path: str | Path | None = None) -> Path:
         if not text or not text.strip():
             raise ValueError("text must not be empty")
 
-        engine = self.load_engine()
         self._ensure_output_dir()
-
         path = Path(output_path) if output_path is not None else self._default_output_path()
-        engine.save_to_file(text, str(path))
-        engine.runAndWait()
-        return path
+
+        for attempt in range(4):
+            engine = self._create_configured_engine()
+            engine.save_to_file(text, str(path))
+            engine.runAndWait()
+            self._convert_aiff_to_wav(path)
+
+            if self._is_audio_file_usable(path):
+                return path
+
+            # pyttsx3 on macOS can intermittently produce header-only files.
+            time.sleep(0.05)
+
+        raise TTSBackendError("pyttsx3 generated an empty audio file")

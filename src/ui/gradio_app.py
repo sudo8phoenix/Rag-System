@@ -12,6 +12,7 @@ from pydantic import ValidationError
 from src.config.loader import load_config
 from src.config.settings import AppConfig
 from src.pipeline import PipelineOrchestrator
+from src.tts.orchestrator import TTSOrchestrator
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_CONFIG_PATH = PROJECT_ROOT / "config" / "config.yaml"
@@ -20,7 +21,7 @@ STT_ENGINE_CHOICES = ["faster-whisper", "whisper", "speechrecognition"]
 WHISPER_MODEL_CHOICES = ["tiny", "base", "small", "medium", "large"]
 CHUNK_STRATEGY_CHOICES = ["line", "character", "paragraph"]
 VECTOR_STORE_CHOICES = ["faiss", "chroma", "qdrant"]
-TTS_ENGINE_CHOICES = ["pyttsx3", "gtts", "kokoro", "bark", "elevenlabs"]
+TTS_ENGINE_CHOICES = list(TTSOrchestrator.SUPPORTED_ENGINES)
 
 APP_CSS = """
 @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
@@ -125,6 +126,7 @@ def config_to_ui_defaults(config: AppConfig) -> dict[str, Any]:
         "tts_engine": config.tts.engine,
         "tts_rate": config.tts.rate,
         "tts_volume": config.tts.volume,
+        "tts_mute": config.tts.mute,
     }
 
 
@@ -143,6 +145,7 @@ def build_config_payload(
     tts_engine: str,
     tts_rate: float,
     tts_volume: float,
+    tts_mute: bool,
     base_config: AppConfig,
 ) -> dict[str, Any]:
     """Create a YAML payload from UI controls."""
@@ -161,6 +164,7 @@ def build_config_payload(
     payload["tts"]["engine"] = tts_engine
     payload["tts"]["rate"] = float(tts_rate)
     payload["tts"]["volume"] = float(tts_volume)
+    payload["tts"]["mute"] = bool(tts_mute)
     return payload
 
 
@@ -208,6 +212,11 @@ def create_gradio_app(
     """Build and return the Gradio Blocks app."""
 
     try:
+        # Workaround for Typer/Click incompatibility: patch Click.Choice to support type subscripting
+        import click
+        if not hasattr(click.Choice, "__class_getitem__"):
+            click.Choice.__class_getitem__ = classmethod(lambda cls, params: cls)
+        
         import gradio as gr
     except ImportError as exc:  # pragma: no cover - depends on optional dependency
         raise RuntimeError("Gradio is required. Install it with `pip install gradio`.") from exc
@@ -275,6 +284,8 @@ def create_gradio_app(
             warning_suffix = ""
             if result.ingest_errors:
                 warning_suffix = f" | ingest warnings={len(result.ingest_errors)}"
+            if result.tts_error:
+                warning_suffix = f"{warning_suffix} | tts warning={result.tts_error}"
 
             return (
                 response_text,
@@ -329,6 +340,8 @@ def create_gradio_app(
                 status = f"{status} | voice confidence={result.voice_confidence:.2f}"
             if result.ingest_errors:
                 status = f"{status} | ingest warnings={len(result.ingest_errors)}"
+            if result.tts_error:
+                status = f"{status} | tts warning={result.tts_error}"
 
             return (
                 response_text,
@@ -354,6 +367,7 @@ def create_gradio_app(
         tts_engine: str,
         tts_rate: float,
         tts_volume: float,
+        tts_mute: bool,
     ) -> str:
         payload = build_config_payload(
             stt_engine=stt_engine,
@@ -369,6 +383,7 @@ def create_gradio_app(
             tts_engine=tts_engine,
             tts_rate=tts_rate,
             tts_volume=tts_volume,
+            tts_mute=tts_mute,
             base_config=runtime_state["config"],
         )
 
@@ -540,6 +555,10 @@ def create_gradio_app(
                         step=0.05,
                         value=defaults["tts_volume"],
                     )
+                    tts_mute = gr.Checkbox(
+                        label="Mute TTS",
+                        value=defaults["tts_mute"],
+                    )
 
             config_status = gr.Textbox(label="Validation / Save Status", interactive=False, lines=6)
             save_apply_button = gr.Button("Save and Apply", variant="primary")
@@ -560,6 +579,7 @@ def create_gradio_app(
                     tts_engine,
                     tts_rate,
                     tts_volume,
+                    tts_mute,
                 ],
                 outputs=[config_status],
             )

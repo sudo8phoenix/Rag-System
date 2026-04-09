@@ -175,8 +175,8 @@ tts:
   engine: pyttsx3
   voice: male
   rate: 1.0
-  volume: 1.0
-  mute: true
+  volume: 0.7
+  mute: false
 ui:
   mode: gradio
   host: 127.0.0.1

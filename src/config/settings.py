@@ -163,7 +163,7 @@ class LLMConfig(BaseModel):
 class TTSConfig(BaseModel):
     """Text-to-speech engine settings."""
 
-    engine: Literal["pyttsx3", "gtts", "kokoro", "bark", "elevenlabs"] = "pyttsx3"
+    engine: Literal["pyttsx3", "gtts", "kokoro"] = "pyttsx3"
     voice: str = "male"
     rate: float = Field(default=1.0, gt=0.0)
     volume: float = Field(default=1.0, ge=0.0, le=1.0)

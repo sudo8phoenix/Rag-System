@@ -46,6 +46,7 @@ class PipelineResult:
     retrieved_chunks: list[dict[str, Any]] = field(default_factory=list)
     ingest_errors: list[dict[str, str]] = field(default_factory=list)
     llm_model: str | None = None
+    tts_error: str | None = None
     success: bool = True
     error_stage: str | None = None
     error_message: str | None = None
@@ -334,8 +335,10 @@ class PipelineOrchestrator:
 
         audio_path: Path | None = None
         audio_played = False
+        tts_error: str | None = None
         mute_enabled = self.config.tts.mute and isinstance(self.tts, TTSOrchestrator)
         if mute_enabled:
+            tts_error = "TTS is muted in config (tts.mute=true)."
             self._log_event(
                 logging.INFO,
                 "tts",
@@ -355,6 +358,7 @@ class PipelineOrchestrator:
                     played=audio_played,
                 )
             except Exception as exc:
+                tts_error = str(exc)
                 self._log_event(
                     logging.WARNING,
                     "tts",
@@ -377,4 +381,5 @@ class PipelineOrchestrator:
             retrieved_chunks=[result.to_dict() for result in retrieved_chunks],
             ingest_errors=list(ingestion.errors),
             llm_model=llm_response.model,
+            tts_error=tts_error,
         )
