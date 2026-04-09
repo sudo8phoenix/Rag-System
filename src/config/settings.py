@@ -140,6 +140,9 @@ class RetrievalConfig(BaseModel):
     hybrid_search: bool = False
     bm25_weight: float = Field(default=0.3, ge=0.0, le=1.0)
     rerank: bool = True
+    rerank_model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
+    rerank_candidate_pool: int = Field(default=10, gt=0)
+    rerank_min_score: float | None = None
 
 
 class LLMConfig(BaseModel):

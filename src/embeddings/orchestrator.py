@@ -8,10 +8,10 @@ from typing import Any, Mapping, Sequence
 from src.config.settings import AppConfig, EmbeddingConfig, RetrievalConfig
 from src.models.chunk import Chunk
 
-from .base import BaseEmbedder, BaseVectorStore, SearchResult
+from .base import BaseEmbedder, BaseVectorStore, EmbeddingDependencyError, SearchResult
 from .embedder import create_embedder
-from .retriever import SemanticRetriever
-from .vectorstore import ChromaVectorStore, FaissVectorStore, LocalVectorStore
+from .retriever import BM25Retriever, CrossEncoderReranker, HybridRetriever, SemanticRetriever
+from .vectorstore import ChromaVectorStore, FaissVectorStore, LocalVectorStore, QdrantVectorStore
 
 
 def create_vector_store(config: EmbeddingConfig | None = None) -> BaseVectorStore:
@@ -21,7 +21,9 @@ def create_vector_store(config: EmbeddingConfig | None = None) -> BaseVectorStor
     if embedding_config.vector_store == "faiss":
         return FaissVectorStore()
     if embedding_config.vector_store == "chroma":
-        return ChromaVectorStore()
+        return ChromaVectorStore(persist_directory=embedding_config.chroma_path)
+    if embedding_config.vector_store == "qdrant":
+        return QdrantVectorStore()
     return LocalVectorStore()
 
 
@@ -35,12 +37,21 @@ class EmbeddingOrchestrator:
         vector_store: BaseVectorStore | None = None,
         embedding_config: EmbeddingConfig | None = None,
         retrieval_config: RetrievalConfig | None = None,
+        reranker: CrossEncoderReranker | None = None,
     ) -> None:
         self.embedding_config = embedding_config or EmbeddingConfig()
         self.retrieval_config = retrieval_config or RetrievalConfig()
         self.embedder = embedder or create_embedder(self.embedding_config)
         self.vector_store = vector_store or create_vector_store(self.embedding_config)
         self.retriever = SemanticRetriever(self.embedder, self.vector_store)
+        self.bm25_retriever = BM25Retriever()
+        self.hybrid_retriever = HybridRetriever(
+            self.retriever,
+            self.bm25_retriever,
+            bm25_weight=self.retrieval_config.bm25_weight,
+        )
+        self._reranker = reranker
+        self._reranker_unavailable = False
 
     @classmethod
     def from_config(cls, config: AppConfig) -> "EmbeddingOrchestrator":
@@ -58,6 +69,7 @@ class EmbeddingOrchestrator:
         metadata: Sequence[Mapping[str, Any] | None] | None = None,
     ) -> None:
         self.retriever.index_chunks(chunks, metadata=metadata)
+        self.bm25_retriever.add_chunks(chunks)
 
     def search(
         self,
@@ -66,11 +78,55 @@ class EmbeddingOrchestrator:
         top_k: int | None = None,
         filters: Mapping[str, Any] | None = None,
     ) -> list[SearchResult]:
-        return self.retriever.search(
-            query,
-            top_k=top_k or self.retrieval_config.top_k,
-            filters=filters,
+        effective_top_k = top_k or self.retrieval_config.top_k
+        candidate_top_k = (
+            max(effective_top_k, self.retrieval_config.rerank_candidate_pool)
+            if self.retrieval_config.rerank
+            else effective_top_k
         )
+
+        if self.retrieval_config.hybrid_search and self.bm25_retriever.count() > 0:
+            self.hybrid_retriever.bm25_weight = self.retrieval_config.bm25_weight
+            initial_results = self.hybrid_retriever.search(
+                query,
+                top_k=candidate_top_k,
+                filters=filters,
+            )
+        else:
+            initial_results = self.retriever.search(
+                query,
+                top_k=candidate_top_k,
+                filters=filters,
+            )
+
+        if not self.retrieval_config.rerank:
+            return initial_results[:effective_top_k]
+
+        reranker = self._get_reranker()
+        if reranker is None:
+            return initial_results[:effective_top_k]
+
+        return reranker.rerank(
+            query,
+            initial_results,
+            top_k=effective_top_k,
+        )
+
+    def _get_reranker(self) -> CrossEncoderReranker | None:
+        if self._reranker is not None:
+            return self._reranker
+        if self._reranker_unavailable:
+            return None
+
+        try:
+            self._reranker = CrossEncoderReranker(
+                self.retrieval_config.rerank_model,
+                min_score=self.retrieval_config.rerank_min_score,
+            )
+        except EmbeddingDependencyError:
+            self._reranker_unavailable = True
+            return None
+        return self._reranker
 
     def save(self, path: str | Path) -> None:
         self.vector_store.save(str(path))
