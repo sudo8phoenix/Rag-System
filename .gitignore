@@ -27,3 +27,11 @@ data/tts/*.wav
 
 # Unit tests
 tests/
+
+# Local-only artifacts to keep out of remote
+example_basic_query.ipynb
+example_batch_ingest.ipynb
+example_custom_chunking.ipynb
+example_retrieval_debug.ipynb
+TTS_PLAYBACK_FIXES.md
+.github/
