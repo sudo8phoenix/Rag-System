@@ -260,14 +260,4 @@ print(result.success)
 - Chroma is the default vector store, with FAISS and Qdrant support available.
 - End-to-end orchestration available via `PipelineOrchestrator` and Gradio UI.
 
-## Roadmap
 
-Next major step is Phase 4:
-
-- LangGraph ReAct-style state graph
-- Dynamic tool routing during reasoning
-- Expanded memory and agent trace capabilities
-
-## License
-
-Internal project for internship task execution. Add your license terms here if this repository will be distributed.
