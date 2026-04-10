@@ -25,11 +25,80 @@ From the repository root:
 ```bash
 cd Rag-System
 python -m venv .venv
-source .venv/bin/activate
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
 If you are using the local environment already present in this workspace, activate that same `.venv` before running the app or tests.
+
+### System Requirements
+
+Before installing Python packages, ensure system-level dependencies are available:
+
+**macOS:**
+```bash
+brew install portaudio ffmpeg
+```
+
+**Linux (Ubuntu/Debian):**
+```bash
+sudo apt-get install portaudio19-dev python3-pyaudio ffmpeg libsndfile1
+```
+
+**Windows:**
+- Download FFmpeg from https://ffmpeg.org/download.html
+- PyAudio wheels are handled by pip
+
+### Ollama Setup (Recommended for Local LLM)
+
+1. Download and install from https://ollama.ai
+2. In a separate terminal, start Ollama:
+   ```bash
+   ollama serve
+   ```
+3. Pull the default model (`mistral`):
+   ```bash
+   ollama pull mistral
+   ```
+4. Verify it's running:
+   ```bash
+   curl http://127.0.0.1:11434/api/tags
+   ```
+
+**Keep the Ollama service running while using the app.** If you close it, LLM queries will fail with a connection error.
+
+### Environment Variables
+
+Create or update a `.env` file in the project root for API keys and custom settings:
+
+```
+# Groq API (required only if using groq as LLM provider)
+GROQ_API_KEY=your_groq_api_key_here
+
+# ============================================================================
+# Ollama Configuration (for local LLM mode)
+# ============================================================================
+# 
+# Ollama Setup:
+#   1. Install from https://ollama.ai
+#   2. Pull model: ollama pull mistral
+#   3. Start service: ollama serve
+#   4. Keep running while using the app
+#
+# Default Ollama address (uncomment to override):
+# OLLAMA_BASE_URL=http://127.0.0.1:11434
+#
+# To use Ollama, update config/config.yaml:
+#   llm:
+#     provider: ollama
+#     model: mistral
+#     base_url: http://127.0.0.1:11434
+
+# Optional: Override default Groq base URL
+# GROQ_BASE_URL=https://api.groq.com/openai/v1
+```
+
+The app will automatically load these variables when it starts. No additional code changes needed.
 
 ## Quick Start
 
@@ -128,19 +197,122 @@ If the preferred engine fails, the orchestrator tries the remaining supported en
 
 ## Troubleshooting
 
-If the app does not start, check the following first:
+### Setup Issues
 
-- The virtual environment is active.
-- `config/config.yaml` is valid YAML.
-- The selected LLM provider is reachable.
-- The configured embedding model and vector store are available.
-- Your OS allows microphone and speaker access.
+**Virtual environment not activating**
+```bash
+# macOS/Linux
+source .venv/bin/activate
 
-If you see empty answers, verify that the source files were actually provided and that retrieval returned relevant chunks.
+# Windows CMD
+.venv\Scripts\activate.bat
 
-If you hear no audio, check `tts.mute` and confirm the backend dependency is installed.
+# Windows PowerShell
+.venv\Scripts\Activate.ps1
+```
 
-If Groq fails with an authentication error, set a valid `GROQ_API_KEY` in your environment or in the config UI.
+**Pip install fails with PyAudio errors**
+- Install system audio libraries first (see Installation section)
+- macOS: `brew install portaudio`
+- Linux: `sudo apt-get install portaudio19-dev`
+- Windows: Download PyAudio wheels or use conda
+
+### LLM Provider Issues
+
+**`ConnectionError: Cannot reach Ollama at http://127.0.0.1:11434`**
+1. Is Ollama installed? Download from https://ollama.ai
+2. Is the service running? In a separate terminal: `ollama serve`
+3. Did you pull a model? `ollama pull mistral`
+4. Check it's accessible: `curl http://127.0.0.1:11434/api/tags`
+
+**`Provider error: mistral not found`**
+- Pull the model: `ollama pull mistral`
+- List available models: `ollama list`
+- Update `config/config.yaml` with an available model name
+
+**Groq API fails with 401 Unauthorized**
+1. Verify `GROQ_API_KEY` is set in `.env`
+2. Check the key is valid at https://console.groq.com
+3. Restart the app after updating `.env`
+
+**App starts but LLM responses are very slow**
+- Ollama model is running on CPU (normal for local setup)
+- Try a smaller model: `ollama pull orca-mini` and update config
+- Check available system RAM with `ollama list`
+
+### Configuration Issues
+
+**`Invalid YAML in config/config.yaml`**
+- Verify indentation (spaces, not tabs)
+- Use a YAML validator: https://www.yamllint.com
+- Check quotes around special characters
+
+**Selected embedding model not found**
+- Model is being downloaded on first use (check logs)
+- If stuck, manually download: `python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('BAAI/bge-m3')"`
+
+### Document & Retrieval Issues
+
+**Empty or irrelevant answers**
+- Are source files actually being provided? Check the UI upload
+- Did the retrieval return chunks? View in the UI response panel
+- Try adjusting `retrieval.top_k` in config (default: 5)
+- For better results, use well-structured documents with headings
+
+**`ParserError: Unsupported format` for a document**
+- Check if the file extension is in the `Supported Document Formats` list in README
+- Verify the file is not corrupted
+- Try converting to `.pdf` or `.txt` as fallback
+
+**Vector store errors or stuck indexing**
+- Delete the vector store cache: `rm -rf data/chroma_db`
+- Restart the app
+- Re-upload and re-ingest documents
+
+### Voice & Audio Issues
+
+**Microphone not working**
+- Check OS permissions: Settings → Privacy & Security → Microphone (macOS)
+- Verify `sounddevice` is installed: `python -c "import sounddevice"`
+- Test system microphone: `python -c "import sounddevice as sd; print(sd.query_devices())"`
+- Restart the app after granting permissions
+
+**`silero-vad` or `faster-whisper` missing**
+- These are in requirements.txt and should install automatically
+- If missing, try: `pip install --upgrade faster-whisper silero-vad`
+
+**Voice input records but transcription fails**
+- STT model is downloading on first use (check logs, be patient)
+- `whisper_model: small` is recommended for fast inference
+- Check GPU memory if using larger models
+
+**No audio output even with `tts.mute: false`**
+1. Check `tts.engine` is installed: `pyttsx3`, `gtts`, or `kokoro`
+2. Verify speakers are working: `python -c "import pygame; pygame.mixer.init()"`
+3. Check OS volume is not muted
+4. View logs for TTS backend errors
+
+### General Debugging
+
+**Enable verbose logging**
+- Increase log level in `config/config.yaml` (if available)
+- Check logs in the `logs/` directory
+
+**Check dependencies are installed correctly**
+```bash
+python -c "from src.config.loader import load_config; config = load_config('config/config.yaml'); print('Config loaded OK')"
+```
+
+**If all else fails, reset to defaults**
+```bash
+# Backup current config
+cp config/config.yaml config/config.yaml.backup
+
+# Delete caches
+rm -rf data/chroma_db logs/*.log
+
+# Restart from Quick Start in README
+```
 
 ## Useful Files
 

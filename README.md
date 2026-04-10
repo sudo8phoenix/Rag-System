@@ -79,26 +79,108 @@ Rag-System/
 
 ## Prerequisites
 
-- Python 3.11+
-- Pip
-- Optional but recommended for local LLM mode:
-	- Ollama running locally when `llm.provider: ollama`
+### Required
+- **Python 3.11 or newer**
+- **Pip** package manager
 
-Notes:
+### System-Level Dependencies
 
-- `PyAudio` may require system-level audio libraries depending on your OS.
-- Some format parsers rely on optional native dependencies in the environment.
+#### macOS
+```bash
+# For audio support (PyAudio)
+brew install portaudio
+
+# For video/encoding support
+brew install ffmpeg
+```
+
+#### Linux (Ubuntu/Debian)
+```bash
+# For audio support (PyAudio)
+sudo apt-get install portaudio19-dev python3-pyaudio
+
+# For encoding and voice support
+sudo apt-get install ffmpeg libsndfile1
+```
+
+#### Windows
+- Install Python 3.11+ with pip
+- PyAudio wheels are included in requirements.txt
+- FFmpeg: Download from https://ffmpeg.org/download.html or `choco install ffmpeg`
+
+### LLM Provider Setup
+
+**For local LLM mode (recommended for privacy): Install Ollama**
+
+1. Download and install from https://ollama.ai
+2. Pull a model (default config uses `mistral`):
+   ```bash
+   ollama pull mistral
+   ```
+   Other popular options: `neural-chat`, `orca-mini`, `llama2`
+
+3. Start the Ollama service in a separate terminal:
+   ```bash
+   ollama serve
+   ```
+   Ollama will run on `http://127.0.0.1:11434` by default.
+
+4. Verify it's running:
+   ```bash
+   curl http://127.0.0.1:11434/api/tags
+   ```
+
+**For remote LLM mode: Groq API (free)**
+
+1. Sign up at https://console.groq.com
+2. Create an API key
+3. Add to `.env` file:
+   ```
+   GROQ_API_KEY=your_api_key_here
+   ```
+4. Update `config/config.yaml`:
+   ```yaml
+   llm:
+     provider: groq
+     model: mixtral-8x7b-32768
+   ```
+
+### Optional Dependencies
+
+- `PyAudio` may require system-level audio libraries (see above by OS)
+- Some document parsers (PDF, Office) depend on native libraries
+- Microphone and speaker access required for voice features
 
 ## Quick Start
 
-1. Create and activate a virtual environment.
-2. Install dependencies.
-3. Review and adjust `config/config.yaml`.
-4. Launch the Gradio app.
-
-Example:
+### Text-Only Mode (No Voice, No Ollama)
 
 ```bash
+cd Rag-System
+python -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+python -m src.ui.gradio_app
+```
+
+Then update `config/config.yaml`:
+```yaml
+llm:
+  provider: groq
+  model: mixtral-8x7b-32768
+voice:
+  input_mode: text
+```
+
+### Local LLM Mode with Ollama (Recommended)
+
+**Prerequisites**: System libraries installed (see Prerequisites section), Ollama installed and running
+
+```bash
+# Terminal 1: Start Ollama service
+ollama serve
+
+# Terminal 2: Set up and run the app
 cd Rag-System
 python -m venv .venv
 source .venv/bin/activate
@@ -106,9 +188,23 @@ pip install -r requirements.txt
 python -m src.ui.gradio_app
 ```
 
-Default UI endpoint:
+The default `config/config.yaml` is already configured for Ollama:
+```yaml
+llm:
+  provider: ollama
+  model: mistral
+  base_url: http://127.0.0.1:11434
+```
 
-- `http://127.0.0.1:7860`
+### With Voice Features
+
+Same steps as Ollama mode above, then in the UI:
+- Go to **Settings** tab
+- Set `voice.input_mode: voice` 
+- Choose an STT model (`small` is good for most machines)
+- Allow microphone access when prompted
+
+Default UI endpoint: `http://127.0.0.1:7860`
 
 ## Configuration
 
