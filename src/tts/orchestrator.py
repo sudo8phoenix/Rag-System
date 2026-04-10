@@ -19,7 +19,6 @@ from .gtts_tts import GTTSTTS
 from .kokoro_tts import KokoroTTS
 from .pyttsx3_tts import Pyttsx3TTS
 
-
 SupportedBackend = Callable[[], BaseTTSBackend]
 
 
@@ -52,7 +51,10 @@ class TTSOrchestrator:
 
     def _candidate_engines(self) -> list[str]:
         primary = self.config.tts.engine
-        return [primary, *[engine for engine in self.SUPPORTED_ENGINES if engine != primary]]
+        return [
+            primary,
+            *[engine for engine in self.SUPPORTED_ENGINES if engine != primary],
+        ]
 
     def _build_backend(self, engine: str) -> BaseTTSBackend:
         if engine in self._backend_cache:

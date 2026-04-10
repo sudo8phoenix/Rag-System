@@ -37,7 +37,9 @@ class CharacterBasedChunker(BaseChunker):
                 start = end if end > start else start + 1
                 continue
 
-            metadata = self._base_metadata(document, config, self.strategy_name, chunk_index)
+            metadata = self._base_metadata(
+                document, config, self.strategy_name, chunk_index
+            )
             metadata.update(
                 {
                     "char_start": start + 1,

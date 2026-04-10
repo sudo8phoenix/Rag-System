@@ -7,7 +7,6 @@ from pathlib import Path
 
 from .base import BaseParser, ParserError
 
-
 HEADING_RE = re.compile(r"^(#{1,6})\s+(.*)$")
 INLINE_CODE_RE = re.compile(r"`([^`]+)`")
 LINK_RE = re.compile(r"\[([^\]]+)\]\(([^)]+)\)")

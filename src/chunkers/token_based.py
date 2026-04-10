@@ -12,7 +12,6 @@ from src.models.document import Document
 
 from .base import BaseChunker, ChunkingError
 
-
 DEFAULT_TOKEN_ENCODING = "cl100k_base"
 
 
@@ -20,14 +19,18 @@ DEFAULT_TOKEN_ENCODING = "cl100k_base"
 def _get_encoding(encoding_name: str) -> Any:
     try:
         import tiktoken
-    except ImportError as exc:  # pragma: no cover - exercised in runtime when optional dep is missing
+    except (
+        ImportError
+    ) as exc:  # pragma: no cover - exercised in runtime when optional dep is missing
         raise ChunkingError(
             "tiktoken is required for token-based chunking. Install it with `pip install tiktoken`."
         ) from exc
 
     try:
         return tiktoken.get_encoding(encoding_name)
-    except Exception as exc:  # pragma: no cover - protects against unknown encoding names
+    except (
+        Exception
+    ) as exc:  # pragma: no cover - protects against unknown encoding names
         raise ChunkingError(f"Unsupported token encoding: {encoding_name}") from exc
 
 
@@ -71,7 +74,9 @@ class TokenBasedChunker(BaseChunker):
                 start = end if end > start else start + 1
                 continue
 
-            metadata = self._base_metadata(document, config, self.strategy_name, chunk_index)
+            metadata = self._base_metadata(
+                document, config, self.strategy_name, chunk_index
+            )
             metadata.update(
                 {
                     "token_start": start + 1,
@@ -118,7 +123,9 @@ class TokenBasedChunker(BaseChunker):
         return encoding_name.strip()
 
     @staticmethod
-    def _snap_to_word_boundary(encoder: Any, token_ids: list[int], start: int, end: int) -> int:
+    def _snap_to_word_boundary(
+        encoder: Any, token_ids: list[int], start: int, end: int
+    ) -> int:
         if end >= len(token_ids):
             return end
 

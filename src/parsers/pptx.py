@@ -76,7 +76,11 @@ class PptxParser(BaseParser):
 
             if getattr(shape, "has_table", False):
                 for row in shape.table.rows:
-                    row_values = [cell.text_frame.text.strip() for cell in row.cells if cell.text_frame.text.strip()]
+                    row_values = [
+                        cell.text_frame.text.strip()
+                        for cell in row.cells
+                        if cell.text_frame.text.strip()
+                    ]
                     if row_values:
                         lines.append(" | ".join(row_values))
 

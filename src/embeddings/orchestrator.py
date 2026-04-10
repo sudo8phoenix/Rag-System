@@ -10,8 +10,18 @@ from src.models.chunk import Chunk
 
 from .base import BaseEmbedder, BaseVectorStore, EmbeddingDependencyError, SearchResult
 from .embedder import create_embedder
-from .retriever import BM25Retriever, CrossEncoderReranker, HybridRetriever, SemanticRetriever
-from .vectorstore import ChromaVectorStore, FaissVectorStore, LocalVectorStore, QdrantVectorStore
+from .retriever import (
+    BM25Retriever,
+    CrossEncoderReranker,
+    HybridRetriever,
+    SemanticRetriever,
+)
+from .vectorstore import (
+    ChromaVectorStore,
+    FaissVectorStore,
+    LocalVectorStore,
+    QdrantVectorStore,
+)
 
 
 def create_vector_store(config: EmbeddingConfig | None = None) -> BaseVectorStore:
@@ -21,9 +31,9 @@ def create_vector_store(config: EmbeddingConfig | None = None) -> BaseVectorStor
     if embedding_config.vector_store == "faiss":
         return FaissVectorStore()
     if embedding_config.vector_store == "chroma":
-        return ChromaVectorStore(persist_directory=embedding_config.chroma_path)
+        return ChromaVectorStore.load(embedding_config.chroma_path)
     if embedding_config.vector_store == "qdrant":
-        return QdrantVectorStore()
+        return QdrantVectorStore.load("./data/qdrant_db")
     return LocalVectorStore()
 
 
@@ -110,6 +120,49 @@ class EmbeddingOrchestrator:
             query,
             initial_results,
             top_k=effective_top_k,
+        )
+
+    def list_documents(self) -> list[dict[str, Any]]:
+        """Summarize indexed source documents from the persisted vector store."""
+
+        records = getattr(self.vector_store, "_records", {})
+        if not isinstance(records, dict) or not records:
+            return []
+
+        grouped: dict[tuple[str, str], dict[str, Any]] = {}
+        for record in records.values():
+            chunk = getattr(record, "chunk", None)
+            if chunk is None:
+                continue
+
+            metadata = dict(getattr(record, "metadata", {}) or {})
+            source_path = str(
+                metadata.get("source_path")
+                or chunk.source_doc.original_metadata.get("path")
+                or chunk.source_doc.filename
+            )
+            key = (source_path, chunk.source_doc.source_type)
+            summary = grouped.setdefault(
+                key,
+                {
+                    "source_path": source_path,
+                    "filename": chunk.source_doc.filename,
+                    "source_type": chunk.source_doc.source_type,
+                    "chunk_count": 0,
+                    "latest_ingested_at": None,
+                },
+            )
+            summary["chunk_count"] += 1
+
+            ingested_at = metadata.get("ingested_at")
+            if isinstance(ingested_at, str) and ingested_at:
+                current_latest = summary["latest_ingested_at"]
+                if current_latest is None or ingested_at > current_latest:
+                    summary["latest_ingested_at"] = ingested_at
+
+        return sorted(
+            grouped.values(),
+            key=lambda item: (item["filename"].lower(), item["source_path"].lower()),
         )
 
     def _get_reranker(self) -> CrossEncoderReranker | None:

@@ -81,7 +81,9 @@ def _json_safe_metadata(metadata: Mapping[str, Any]) -> dict[str, Any]:
         if isinstance(value, (str, int, float, bool)) or value is None:
             safe_metadata[key] = value
         else:
-            safe_metadata[f"{key}_json"] = json.dumps(value, sort_keys=True, default=str)
+            safe_metadata[f"{key}_json"] = json.dumps(
+                value, sort_keys=True, default=str
+            )
     return safe_metadata
 
 
@@ -139,7 +141,9 @@ class LocalVectorStore(BaseVectorStore):
         normalized_query = normalize_vector(query_vector)
         candidates: list[tuple[float, StoredChunkRecord]] = []
         for record in self._records.values():
-            if filters and any(record.metadata.get(key) != value for key, value in filters.items()):
+            if filters and any(
+                record.metadata.get(key) != value for key, value in filters.items()
+            ):
                 continue
             score = cosine_similarity(normalized_query, record.vector)
             candidates.append((score, record))
@@ -223,7 +227,9 @@ class ChromaVectorStore(LocalVectorStore):
 
         try:
             self.persist_directory.mkdir(parents=True, exist_ok=True)
-            self._chroma_client = chromadb.PersistentClient(path=str(self.persist_directory))
+            self._chroma_client = chromadb.PersistentClient(
+                path=str(self.persist_directory)
+            )
             self._chroma_collection = self._chroma_client.get_or_create_collection(
                 name=self.collection_name,
                 metadata={"hnsw:space": "cosine", "backend": self.backend_name},
@@ -350,7 +356,9 @@ class ChromaVectorStore(LocalVectorStore):
                     chunk=record.chunk,
                     score=1.0 - distance,
                     distance=distance,
-                    metadata=dict(metadatas[index] if index < len(metadatas) else record.metadata),
+                    metadata=dict(
+                        metadatas[index] if index < len(metadatas) else record.metadata
+                    ),
                 )
             )
 
@@ -369,7 +377,9 @@ class ChromaVectorStore(LocalVectorStore):
         store._sync_chromadb_collection()
 
         if not store._records and store._chroma_collection is not None:
-            collection_payload = store._chroma_collection.get(include=["documents", "metadatas", "embeddings"])
+            collection_payload = store._chroma_collection.get(
+                include=["documents", "metadatas", "embeddings"]
+            )
             ids = collection_payload.get("ids", [])
             documents = collection_payload.get("documents", [])
             metadatas = collection_payload.get("metadatas", [])
@@ -377,11 +387,14 @@ class ChromaVectorStore(LocalVectorStore):
 
             for index, chunk_id in enumerate(ids):
                 metadata = dict(metadatas[index] or {})
+                raw_embedding = embeddings[index] if index < len(embeddings) else None
                 source_doc = Document(
                     text=str(metadata.get("source_doc_text", documents[index] or "")),
                     filename=str(metadata.get("filename", chunk_id)),
                     source_type=str(metadata.get("source_type", "unknown")),
-                    original_metadata=json.loads(metadata.get("source_doc_metadata_json", "{}")),
+                    original_metadata=json.loads(
+                        metadata.get("source_doc_metadata_json", "{}")
+                    ),
                 )
                 chunk_metadata = json.loads(metadata.get("chunk_metadata_json", "{}"))
                 chunk = Chunk(
@@ -394,7 +407,7 @@ class ChromaVectorStore(LocalVectorStore):
                 )
                 store._records[chunk.chunk_id] = StoredChunkRecord(
                     chunk=chunk,
-                    vector=[float(value) for value in (embeddings[index] or [])],
+                    vector=[] if raw_embedding is None else [float(value) for value in raw_embedding],
                     metadata=_merge_metadata(chunk, chunk_metadata),
                 )
 
@@ -605,7 +618,9 @@ class QdrantVectorStore(LocalVectorStore):
         score = float(getattr(point, "score", 0.0))
         metadata = dict(payload)
         metadata.setdefault("score", score)
-        return StoredChunkRecord(chunk=chunk, vector=[float(value) for value in vector], metadata=metadata)
+        return StoredChunkRecord(
+            chunk=chunk, vector=[float(value) for value in vector], metadata=metadata
+        )
 
     def add(
         self,
@@ -658,7 +673,9 @@ class QdrantVectorStore(LocalVectorStore):
                     "vector": vector,
                     "payload": self._qdrant_metadata(chunk, extra_metadata),
                 }
-                for chunk, vector, extra_metadata in zip(chunks, normalized_vectors, metadata)
+                for chunk, vector, extra_metadata in zip(
+                    chunks, normalized_vectors, metadata
+                )
             ]
         )
 
@@ -690,7 +707,9 @@ class QdrantVectorStore(LocalVectorStore):
             if record is None:
                 continue
 
-            score = float(getattr(point, "score", 1.0 - float(getattr(point, "distance", 1.0))))
+            score = float(
+                getattr(point, "score", 1.0 - float(getattr(point, "distance", 1.0)))
+            )
             distance = float(getattr(point, "distance", 1.0 - score))
             payload = dict(getattr(point, "payload", {}) or record.metadata)
             results.append(
@@ -728,7 +747,9 @@ class QdrantVectorStore(LocalVectorStore):
                     {
                         "id": record.chunk.chunk_id,
                         "vector": record.vector,
-                        "payload": store._qdrant_metadata(record.chunk, record.metadata),
+                        "payload": store._qdrant_metadata(
+                            record.chunk, record.metadata
+                        ),
                     }
                     for record in store._records.values()
                 ]

@@ -44,17 +44,23 @@ class HtmlParser(BaseParser):
         used_trafilatura = False
         trafilatura_text = ""
         if trafilatura is not None:
-            extracted = trafilatura.extract(raw_html, include_links=False, include_formatting=False)
+            extracted = trafilatura.extract(
+                raw_html, include_links=False, include_formatting=False
+            )
             if extracted and extracted.strip():
                 used_trafilatura = True
                 trafilatura_text = extracted.strip()
 
-        tables = self._extract_tables(soup, raw_html) if hasattr(soup, "find_all") else []
+        tables = (
+            self._extract_tables(soup, raw_html) if hasattr(soup, "find_all") else []
+        )
 
         body = getattr(soup, "body", None) or soup
         text_lines: list[str] = []
         if hasattr(body, "stripped_strings"):
-            text_lines = [line.strip() for line in body.stripped_strings if line.strip()]
+            text_lines = [
+                line.strip() for line in body.stripped_strings if line.strip()
+            ]
         elif hasattr(soup, "select"):
             for selector in ("h1, h2, h3, h4, h5, h6", "p", "li"):
                 for node in soup.select(selector):
@@ -67,7 +73,11 @@ class HtmlParser(BaseParser):
         else:
             content_text = "\n".join(text_lines).strip()
 
-        title = soup.title.string.strip() if getattr(soup, "title", None) and soup.title.string else None
+        title = (
+            soup.title.string.strip()
+            if getattr(soup, "title", None) and soup.title.string
+            else None
+        )
         table_text = self._render_tables(tables)
         full_text = content_text
         if title:
@@ -167,7 +177,9 @@ class HtmlParser(BaseParser):
                 for col_offset in range(colspan):
                     row.append(value)
                     for row_offset in range(1, rowspan):
-                        span_map[(row_index + row_offset, col_index + col_offset)] = value
+                        span_map[(row_index + row_offset, col_index + col_offset)] = (
+                            value
+                        )
                 col_index += colspan
 
             while (row_index, col_index) in span_map:

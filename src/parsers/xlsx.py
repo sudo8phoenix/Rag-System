@@ -73,7 +73,9 @@ class XlsxParser(BaseParser):
         try:
             return openpyxl.load_workbook(file_path, data_only=True, read_only=True)
         except Exception as exc:  # pragma: no cover - backend exceptions vary
-            raise ParserError(f"Unable to open XLSX workbook {file_path}: {exc}") from exc
+            raise ParserError(
+                f"Unable to open XLSX workbook {file_path}: {exc}"
+            ) from exc
 
     def _extract_sheet_rows(self, worksheet: Any) -> list[list[str]]:
         rows: list[list[str]] = []

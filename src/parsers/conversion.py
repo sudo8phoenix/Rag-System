@@ -11,7 +11,6 @@ from typing import Iterator
 
 from .base import ParserError
 
-
 LEGACY_CONVERSION_TARGETS: dict[str, str] = {
     ".doc": "docx",
     ".ppt": "pptx",

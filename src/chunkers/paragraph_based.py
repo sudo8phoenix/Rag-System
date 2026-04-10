@@ -17,7 +17,9 @@ class ParagraphBasedChunker(BaseChunker):
     strategy_name = "paragraph"
 
     def chunk(self, document: Document, config: ChunkingConfig) -> list[Chunk]:
-        paragraphs = [part.strip() for part in re.split(r"\n{2,}", document.text) if part.strip()]
+        paragraphs = [
+            part.strip() for part in re.split(r"\n{2,}", document.text) if part.strip()
+        ]
         if not paragraphs:
             return []
 
@@ -42,7 +44,10 @@ class ParagraphBasedChunker(BaseChunker):
                     if new_paragraphs_consumed == 0 and overlap_count > 0:
                         overlap_count = 0
                         continue
-                    if len(current_text) >= config.min_chunk_size or new_paragraphs_consumed > 0:
+                    if (
+                        len(current_text) >= config.min_chunk_size
+                        or new_paragraphs_consumed > 0
+                    ):
                         break
 
                 chunk_paragraphs.append(candidate)
@@ -65,7 +70,9 @@ class ParagraphBasedChunker(BaseChunker):
             paragraph_start = start_index + 1
             paragraph_end = cursor
 
-            metadata = self._base_metadata(document, config, self.strategy_name, chunk_index)
+            metadata = self._base_metadata(
+                document, config, self.strategy_name, chunk_index
+            )
             metadata.update(
                 {
                     "paragraph_start": paragraph_start,

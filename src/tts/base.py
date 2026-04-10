@@ -82,7 +82,9 @@ class BaseTTSBackend(ABC):
         return self.output_dir / f"{self.engine_name}_{uuid4().hex}{self.output_suffix}"
 
     @abstractmethod
-    def synthesize_to_file(self, text: str, output_path: str | Path | None = None) -> Path:
+    def synthesize_to_file(
+        self, text: str, output_path: str | Path | None = None
+    ) -> Path:
         """Generate speech audio for the provided text and write it to disk."""
 
     def load_audio(self, audio_path: str | Path) -> Any:
@@ -92,12 +94,18 @@ class BaseTTSBackend(ABC):
             raise FileNotFoundError(f"Audio file not found: {path}")
 
         if self._mixer is None:
-            self._mixer = self._mixer_source() if callable(self._mixer_source) else self._mixer_source
+            self._mixer = (
+                self._mixer_source()
+                if callable(self._mixer_source)
+                else self._mixer_source
+            )
 
         try:
             self._mixer.init()
         except Exception as exc:  # pragma: no cover - backend specific
-            raise TTSPlaybackError(f"Unable to initialize audio playback: {exc}") from exc
+            raise TTSPlaybackError(
+                f"Unable to initialize audio playback: {exc}"
+            ) from exc
 
         return self._mixer
 
@@ -116,7 +124,9 @@ class BaseTTSBackend(ABC):
                 return
             raise TTSPlaybackError(f"Unable to play audio {audio_path}: {exc}") from exc
 
-    def _play_audio_with_system_player(self, audio_path: str | Path, *, block: bool) -> bool:
+    def _play_audio_with_system_player(
+        self, audio_path: str | Path, *, block: bool
+    ) -> bool:
         """Fallback to OS-native audio playback when pygame cannot decode the file."""
         if sys.platform != "darwin":
             return False

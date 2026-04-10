@@ -85,7 +85,9 @@ class ChunkingRegistry:
 
     def get_chunker(self, document: Document) -> BaseChunker:
         strategy = self._selected_strategy(document)
-        return self._chunkers.get(strategy, self._chunkers[_normalize_strategy(self.config.strategy)])
+        return self._chunkers.get(
+            strategy, self._chunkers[_normalize_strategy(self.config.strategy)]
+        )
 
     def chunk_document(self, document: Document) -> list[Chunk]:
         chunker = self.get_chunker(document)

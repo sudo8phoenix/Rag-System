@@ -22,7 +22,10 @@ def format_context(context_items: Sequence[str | Mapping[str, object]] | None) -
     if not context_items:
         return "No context provided."
 
-    lines = [_stringify_context_item(item, idx) for idx, item in enumerate(context_items, start=1)]
+    lines = [
+        _stringify_context_item(item, idx)
+        for idx, item in enumerate(context_items, start=1)
+    ]
     return "\n".join(lines)
 
 

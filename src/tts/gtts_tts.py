@@ -35,7 +35,9 @@ class GTTSTTS(BaseTTSBackend):
         mixer_module: Any | Callable[[], Any] | None = None,
         output_dir: str | Path | None = None,
     ) -> None:
-        super().__init__(config=config, mixer_module=mixer_module, output_dir=output_dir)
+        super().__init__(
+            config=config, mixer_module=mixer_module, output_dir=output_dir
+        )
         self._gtts_factory = gtts_factory or _default_gtts_factory
 
     @classmethod
@@ -47,7 +49,10 @@ class GTTSTTS(BaseTTSBackend):
         if requested in {"male", "female", ""}:
             return "en"
 
-        if len(requested) in {2, 5} and requested.replace("-", "").replace("_", "").isalpha():
+        if (
+            len(requested) in {2, 5}
+            and requested.replace("-", "").replace("_", "").isalpha()
+        ):
             return requested
 
         if requested.startswith("en"):
@@ -55,16 +60,24 @@ class GTTSTTS(BaseTTSBackend):
 
         return "en"
 
-    def synthesize_to_file(self, text: str, output_path: str | Path | None = None) -> Path:
+    def synthesize_to_file(
+        self, text: str, output_path: str | Path | None = None
+    ) -> Path:
         if not text or not text.strip():
             raise ValueError("text must not be empty")
 
         self._ensure_output_dir()
-        path = Path(output_path) if output_path is not None else self._default_output_path()
+        path = (
+            Path(output_path)
+            if output_path is not None
+            else self._default_output_path()
+        )
         slow = float(self.config.rate) < 1.0
 
         try:
-            tts = self._gtts_factory(text=text, lang=self._resolve_language(), slow=slow)
+            tts = self._gtts_factory(
+                text=text, lang=self._resolve_language(), slow=slow
+            )
             tts.save(str(path))
         except TTSDependencyError:
             raise

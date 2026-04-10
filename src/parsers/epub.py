@@ -41,7 +41,9 @@ class EpubParser(BaseParser):
 
         for item in book.get_items_of_type(ITEM_DOCUMENT):
             raw_content = item.get_body_content().decode("utf-8", errors="ignore")
-            chapter_text, title = self._extract_chapter_text(raw_content, fallback_title=item.get_name())
+            chapter_text, title = self._extract_chapter_text(
+                raw_content, fallback_title=item.get_name()
+            )
             if not chapter_text:
                 continue
 
@@ -75,7 +77,9 @@ class EpubParser(BaseParser):
             metadata=metadata,
         )
 
-    def _extract_chapter_text(self, html: str, *, fallback_title: str) -> tuple[str, str]:
+    def _extract_chapter_text(
+        self, html: str, *, fallback_title: str
+    ) -> tuple[str, str]:
         if BeautifulSoup is None:
             stripped = " ".join(html.replace("<", " ").replace(">", " ").split())
             return stripped, fallback_title
@@ -83,5 +87,7 @@ class EpubParser(BaseParser):
         soup = BeautifulSoup(html, "html.parser")
         title_node = soup.find(["h1", "h2", "h3", "title"])
         title = title_node.get_text(" ", strip=True) if title_node else fallback_title
-        chapter_text = "\n".join(part.strip() for part in soup.stripped_strings if part.strip())
+        chapter_text = "\n".join(
+            part.strip() for part in soup.stripped_strings if part.strip()
+        )
         return chapter_text, title

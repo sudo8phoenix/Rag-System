@@ -1,6 +1,20 @@
 """Configuration package exports."""
 
 from src.config.loader import ConfigLoadError, ConfigValidationError, load_config
+from src.config.profiles import (
+    PROFILE_FILE_PREFIX,
+    ProfileConfigurationError,
+    iter_profile_files,
+    list_profile_names,
+    list_profile_paths,
+    load_profile,
+    load_profile_from_path,
+    normalize_profile_name,
+    profile_exists,
+    profile_name_from_path,
+    profile_path,
+    save_profile,
+)
 from src.config.settings import (
     AgentConfig,
     AppConfig,
@@ -18,6 +32,18 @@ __all__ = [
     "ConfigLoadError",
     "ConfigValidationError",
     "load_config",
+    "PROFILE_FILE_PREFIX",
+    "ProfileConfigurationError",
+    "iter_profile_files",
+    "list_profile_names",
+    "list_profile_paths",
+    "load_profile",
+    "load_profile_from_path",
+    "normalize_profile_name",
+    "profile_exists",
+    "profile_name_from_path",
+    "profile_path",
+    "save_profile",
     "AgentConfig",
     "AppConfig",
     "ChunkingConfig",

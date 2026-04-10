@@ -12,7 +12,6 @@ from xml.etree import ElementTree as ET
 
 from .base import BaseParser, ParserError
 
-
 W_NS = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
 
 
@@ -100,7 +99,9 @@ class DocxParser(BaseParser):
             return None
         return int(match.group(1))
 
-    def _extract_table_data(self, table: ET.Element, paragraph_index: int) -> dict[str, Any]:
+    def _extract_table_data(
+        self, table: ET.Element, paragraph_index: int
+    ) -> dict[str, Any]:
         rows: list[list[str]] = []
         for row in table.findall(f"./{W_NS}tr"):
             cell_texts = []

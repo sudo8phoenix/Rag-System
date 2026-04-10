@@ -102,7 +102,9 @@ class MicrophoneCapture:
                         {
                             "name": info.get("name", "unknown"),
                             "max_input_channels": int(info.get("maxInputChannels", 0)),
-                            "default_samplerate": float(info.get("defaultSampleRate", 0)),
+                            "default_samplerate": float(
+                                info.get("defaultSampleRate", 0)
+                            ),
                         }
                     )
             pa.terminate()
@@ -138,7 +140,9 @@ class MicrophoneCapture:
                 pass
             collected.append(self._to_list(indata))
 
-        max_chunks = max(1, int((duration_seconds * self.sample_rate) / self.chunk_size))
+        max_chunks = max(
+            1, int((duration_seconds * self.sample_rate) / self.chunk_size)
+        )
         with sd.InputStream(
             samplerate=self.sample_rate,
             channels=self.channels,

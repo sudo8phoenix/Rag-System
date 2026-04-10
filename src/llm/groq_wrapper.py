@@ -23,7 +23,9 @@ except ImportError:  # pragma: no cover - optional dependency at import time
 JSONDict = dict[str, Any]
 HttpGetJson = Callable[[str, dict[str, str], float], JSONDict]
 HttpPostJson = Callable[[str, JSONDict, dict[str, str], float], JSONDict]
-HttpPostJsonStream = Callable[[str, JSONDict, dict[str, str], float], Iterator[JSONDict]]
+HttpPostJsonStream = Callable[
+    [str, JSONDict, dict[str, str], float], Iterator[JSONDict]
+]
 
 EMPTY_RESPONSE_FALLBACK = (
     "I could not generate a response for that request. "
@@ -55,7 +57,9 @@ def _read_env_file_value(key: str) -> str | None:
 
 def _http_get_json(url: str, headers: dict[str, str], timeout: float) -> JSONDict:
     req = request.Request(url=url, method="GET", headers=headers)
-    with request.urlopen(req, timeout=timeout) as response:  # noqa: S310 - trusted API URL
+    with request.urlopen(
+        req, timeout=timeout
+    ) as response:  # noqa: S310 - trusted API URL
         payload = response.read().decode("utf-8")
     return json.loads(payload) if payload else {}
 
@@ -68,7 +72,9 @@ def _http_post_json(
 ) -> JSONDict:
     data = json.dumps(payload).encode("utf-8")
     req = request.Request(url=url, data=data, method="POST", headers=headers)
-    with request.urlopen(req, timeout=timeout) as response:  # noqa: S310 - trusted API URL
+    with request.urlopen(
+        req, timeout=timeout
+    ) as response:  # noqa: S310 - trusted API URL
         body = response.read().decode("utf-8")
     return json.loads(body) if body else {}
 
@@ -81,7 +87,9 @@ def _http_post_json_stream(
 ) -> Iterator[JSONDict]:
     data = json.dumps(payload).encode("utf-8")
     req = request.Request(url=url, data=data, method="POST", headers=headers)
-    with request.urlopen(req, timeout=timeout) as response:  # noqa: S310 - trusted API URL
+    with request.urlopen(
+        req, timeout=timeout
+    ) as response:  # noqa: S310 - trusted API URL
         for raw_line in response:
             line = raw_line.decode("utf-8").strip()
             if not line or not line.startswith("data:"):
@@ -122,7 +130,8 @@ class GroqLLM:
         self._http_post_json = http_post_json or _http_post_json
         self._http_post_json_stream = http_post_json_stream or _http_post_json_stream
         self._has_custom_http = any(
-            item is not None for item in (http_get_json, http_post_json, http_post_json_stream)
+            item is not None
+            for item in (http_get_json, http_post_json, http_post_json_stream)
         )
         self._openai_client: OpenAI | None = None
 
@@ -176,8 +185,9 @@ class GroqLLM:
                 "Groq authentication/authorization failed. "
                 "Check GROQ_API_KEY, model access permissions, and account limits."
             )
-            return f"Groq request failed for {endpoint}: HTTP {status_code}. {guidance}" + (
-                f" Detail: {message}" if message else ""
+            return (
+                f"Groq request failed for {endpoint}: HTTP {status_code}. {guidance}"
+                + (f" Detail: {message}" if message else "")
             )
 
         if status_code is not None:
@@ -214,8 +224,9 @@ class GroqLLM:
                 "Groq authentication/authorization failed. "
                 "Check GROQ_API_KEY, model access permissions, and account limits."
             )
-            return f"Groq request failed for {endpoint}: HTTP {exc.code}. {guidance}" + (
-                f" Detail: {detail}" if detail else ""
+            return (
+                f"Groq request failed for {endpoint}: HTTP {exc.code}. {guidance}"
+                + (f" Detail: {detail}" if detail else "")
             )
 
         return f"Groq request failed for {endpoint}: HTTP {exc.code}" + (
@@ -237,11 +248,15 @@ class GroqLLM:
     def _post(self, endpoint: str, payload: JSONDict) -> JSONDict:
         url = f"{self.base_url}{endpoint}"
         try:
-            result = self._http_post_json(url, payload, self._headers(), self.timeout_seconds)
+            result = self._http_post_json(
+                url, payload, self._headers(), self.timeout_seconds
+            )
         except error.HTTPError as exc:
             raise LLMProviderError(self._format_http_error(exc, endpoint)) from exc
         except (error.URLError, TimeoutError, OSError, json.JSONDecodeError) as exc:
-            raise LLMProviderError(f"Groq request failed for {endpoint}: {exc}") from exc
+            raise LLMProviderError(
+                f"Groq request failed for {endpoint}: {exc}"
+            ) from exc
 
         if "error" in result:
             raise LLMProviderError(str(result["error"]))
@@ -259,7 +274,9 @@ class GroqLLM:
         except error.HTTPError as exc:
             raise LLMProviderError(self._format_http_error(exc, endpoint)) from exc
         except (error.URLError, TimeoutError, OSError, json.JSONDecodeError) as exc:
-            raise LLMProviderError(f"Groq streaming request failed for {endpoint}: {exc}") from exc
+            raise LLMProviderError(
+                f"Groq streaming request failed for {endpoint}: {exc}"
+            ) from exc
 
     def _build_payload(
         self,
@@ -311,7 +328,9 @@ class GroqLLM:
             try:
                 response = self._client().models.list()
             except Exception as exc:
-                raise LLMConnectionError(self._format_openai_error(exc, "/models")) from exc
+                raise LLMConnectionError(
+                    self._format_openai_error(exc, "/models")
+                ) from exc
 
             model_names: list[str] = []
             for model in getattr(response, "data", []):
@@ -379,7 +398,9 @@ class GroqLLM:
                     messages=payload["messages"],
                 )
             except Exception as exc:
-                raise LLMProviderError(self._format_openai_error(exc, "/chat/completions")) from exc
+                raise LLMProviderError(
+                    self._format_openai_error(exc, "/chat/completions")
+                ) from exc
 
             choices = getattr(result, "choices", [])
             first_choice = choices[0] if choices else None
@@ -392,7 +413,8 @@ class GroqLLM:
                 text=self._normalize_response_text(text),
                 model=str(getattr(result, "model", self.config.model)),
                 prompt=str(payload["messages"][1]["content"]),
-                done_reason=str(getattr(first_choice, "finish_reason", "") or "") or None,
+                done_reason=str(getattr(first_choice, "finish_reason", "") or "")
+                or None,
                 raw=raw,
             )
 
@@ -400,7 +422,9 @@ class GroqLLM:
 
         choices = result.get("choices", [])
         first_choice = choices[0] if choices else {}
-        message = first_choice.get("message", {}) if isinstance(first_choice, dict) else {}
+        message = (
+            first_choice.get("message", {}) if isinstance(first_choice, dict) else {}
+        )
         text = self._extract_text_from_message_content(message.get("content", ""))
 
         return LLMResponse(
@@ -436,10 +460,14 @@ class GroqLLM:
             choices = event.get("choices", [])
             first_choice = choices[0] if choices else {}
 
-            delta = first_choice.get("delta", {}) if isinstance(first_choice, dict) else {}
+            delta = (
+                first_choice.get("delta", {}) if isinstance(first_choice, dict) else {}
+            )
             token = str(delta.get("content", "")) if isinstance(delta, dict) else ""
             done_reason = (
-                first_choice.get("finish_reason") if isinstance(first_choice, dict) else None
+                first_choice.get("finish_reason")
+                if isinstance(first_choice, dict)
+                else None
             )
             done = done_reason is not None
 

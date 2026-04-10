@@ -18,7 +18,9 @@ class TagBasedChunker(BaseChunker):
     strategy_name = "tag_based"
 
     def chunk(self, document: Document, config: ChunkingConfig) -> list[Chunk]:
-        target_tags = [tag.lower() for tag in (config.target_tags or ["record", "article", "item"])]
+        target_tags = [
+            tag.lower() for tag in (config.target_tags or ["record", "article", "item"])
+        ]
         chunks = self._chunk_with_xml(document, config, target_tags)
         if chunks:
             return chunks
@@ -41,11 +43,15 @@ class TagBasedChunker(BaseChunker):
             if tag_name not in target_tags:
                 continue
 
-            element_text = ET.tostring(element, encoding="unicode", method="xml").strip()
+            element_text = ET.tostring(
+                element, encoding="unicode", method="xml"
+            ).strip()
             if not element_text:
                 continue
 
-            metadata = self._base_metadata(document, config, self.strategy_name, len(chunks))
+            metadata = self._base_metadata(
+                document, config, self.strategy_name, len(chunks)
+            )
             metadata.update(
                 {
                     "tag": tag_name,
@@ -80,8 +86,16 @@ class TagBasedChunker(BaseChunker):
             for match in pattern.finditer(document.text):
                 full_text = match.group(0).strip()
                 attrs = self._parse_attrs(match.group("attrs") or "")
-                metadata = self._base_metadata(document, config, self.strategy_name, len(chunks))
-                metadata.update({"tag": tag, "attributes": attrs, "path": f"/{tag}[{len(chunks) + 1}]"})
+                metadata = self._base_metadata(
+                    document, config, self.strategy_name, len(chunks)
+                )
+                metadata.update(
+                    {
+                        "tag": tag,
+                        "attributes": attrs,
+                        "path": f"/{tag}[{len(chunks) + 1}]",
+                    }
+                )
                 chunks.append(
                     self._build_chunk(
                         text=full_text,

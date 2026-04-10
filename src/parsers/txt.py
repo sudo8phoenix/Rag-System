@@ -55,7 +55,11 @@ class TxtParser(BaseParser):
                 continue
             tried.append(encoding)
             try:
-                return raw_bytes.decode(encoding), encoding, {"encoding_candidates": tried}
+                return (
+                    raw_bytes.decode(encoding),
+                    encoding,
+                    {"encoding_candidates": tried},
+                )
             except UnicodeDecodeError:
                 continue
 

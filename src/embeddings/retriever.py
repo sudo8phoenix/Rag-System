@@ -152,7 +152,10 @@ class BM25Retriever:
             return []
 
         if self._bm25_index is not None and query_tokens:
-            return [float(score) for score in self._bm25_index.get_scores(list(query_tokens))]
+            return [
+                float(score)
+                for score in self._bm25_index.get_scores(list(query_tokens))
+            ]
 
         return [
             self._fallback_score(query_tokens, document_tokens)
@@ -192,7 +195,9 @@ class BM25Retriever:
             "chunk_id": chunk.chunk_id,
             "chunk_index": chunk.chunk_index,
         }
-        return all(combined_metadata.get(key) == value for key, value in filters.items())
+        return all(
+            combined_metadata.get(key) == value for key, value in filters.items()
+        )
 
 
 class HybridRetriever:
@@ -220,8 +225,12 @@ class HybridRetriever:
             return []
 
         candidate_top_k = max(top_k * 3, top_k)
-        dense_results = self.dense_retriever.search(query, top_k=candidate_top_k, filters=filters)
-        bm25_results = self.bm25_retriever.search(query, top_k=candidate_top_k, filters=filters)
+        dense_results = self.dense_retriever.search(
+            query, top_k=candidate_top_k, filters=filters
+        )
+        bm25_results = self.bm25_retriever.search(
+            query, top_k=candidate_top_k, filters=filters
+        )
 
         if not dense_results:
             return bm25_results[:top_k]
@@ -261,7 +270,9 @@ class HybridRetriever:
         dense_weight = 1.0 - self.bm25_weight
         merged: list[SearchResult] = []
         for item in aggregate.values():
-            combined_score = (dense_weight * item["dense"]) + (self.bm25_weight * item["bm25"])
+            combined_score = (dense_weight * item["dense"]) + (
+                self.bm25_weight * item["bm25"]
+            )
             metadata = dict(item["metadata"])
             metadata.update(
                 {
@@ -351,5 +362,26 @@ class CrossEncoderReranker:
             )
             if len(reranked) >= top_k:
                 break
+
+        if not reranked and reranked_pairs:
+            # Keep query flow grounded even when a strict threshold filters all items.
+            for result, score in reranked_pairs[:top_k]:
+                metadata = dict(result.metadata)
+                metadata.update(
+                    {
+                        "reranked": False,
+                        "rerank_fallback": True,
+                        "reranker_model": self.model_name,
+                        "rerank_score": score,
+                    }
+                )
+                reranked.append(
+                    SearchResult(
+                        chunk=result.chunk,
+                        score=score,
+                        distance=1.0 - score,
+                        metadata=metadata,
+                    )
+                )
 
         return reranked

@@ -41,7 +41,9 @@ class LineBasedChunker(BaseChunker):
                 start = end
                 continue
 
-            metadata = self._base_metadata(document, config, self.strategy_name, chunk_index)
+            metadata = self._base_metadata(
+                document, config, self.strategy_name, chunk_index
+            )
             metadata.update(
                 {
                     "line_start": start + 1,

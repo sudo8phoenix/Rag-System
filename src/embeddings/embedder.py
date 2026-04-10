@@ -14,7 +14,6 @@ from src.config.settings import EmbeddingConfig
 
 from .base import BaseEmbedder, EmbeddingDependencyError, normalize_vector
 
-
 TOKEN_PATTERN = re.compile(r"[A-Za-z0-9']+")
 
 OLLAMA_EMBED_MODELS = {
@@ -25,7 +24,9 @@ OLLAMA_EMBED_MODELS = {
 }
 
 
-def _http_post_json(url: str, payload: dict[str, object], timeout: float) -> dict[str, object]:
+def _http_post_json(
+    url: str, payload: dict[str, object], timeout: float
+) -> dict[str, object]:
     data = json.dumps(payload).encode("utf-8")
     req = request.Request(
         url=url,
@@ -33,7 +34,9 @@ def _http_post_json(url: str, payload: dict[str, object], timeout: float) -> dic
         method="POST",
         headers={"Content-Type": "application/json"},
     )
-    with request.urlopen(req, timeout=timeout) as response:  # noqa: S310 - trusted endpoint
+    with request.urlopen(
+        req, timeout=timeout
+    ) as response:  # noqa: S310 - trusted endpoint
         body = response.read().decode("utf-8")
     return json.loads(body) if body else {}
 
@@ -75,11 +78,19 @@ class SentenceTransformerEmbedder(BaseEmbedder):
     def __init__(self, model_name: str, *, device: str = "cpu") -> None:
         try:
             from sentence_transformers import SentenceTransformer
-        except ImportError as exc:  # pragma: no cover - exercised when dependency exists
-            raise EmbeddingDependencyError("sentence-transformers is not installed") from exc
+        except (
+            ImportError
+        ) as exc:  # pragma: no cover - exercised when dependency exists
+            raise EmbeddingDependencyError(
+                "sentence-transformers is not installed"
+            ) from exc
 
         self._model = SentenceTransformer(model_name, device=device)
-        self.dimension = int(self._model.get_sentence_embedding_dimension())
+        get_dimension = getattr(self._model, "get_embedding_dimension", None)
+        if callable(get_dimension):
+            self.dimension = int(get_dimension())
+        else:
+            self.dimension = int(self._model.get_sentence_embedding_dimension())
 
     def embed_texts(self, texts: Sequence[str]) -> list[list[float]]:
         embeddings = self._model.encode(
@@ -132,7 +143,9 @@ class OllamaEmbedder(BaseEmbedder):
             ) from exc
 
         if not isinstance(response, dict):
-            raise EmbeddingDependencyError(f"Unexpected Ollama response type for {endpoint}")
+            raise EmbeddingDependencyError(
+                f"Unexpected Ollama response type for {endpoint}"
+            )
         return response
 
     def _embed_batch(self, texts: list[str]) -> list[list[float]] | None:
@@ -150,7 +163,9 @@ class OllamaEmbedder(BaseEmbedder):
         vectors: list[list[float]] = []
         for vector in embeddings:
             if not isinstance(vector, list):
-                raise EmbeddingDependencyError("Invalid vector payload returned by Ollama /api/embed")
+                raise EmbeddingDependencyError(
+                    "Invalid vector payload returned by Ollama /api/embed"
+                )
             vectors.append([float(value) for value in vector])
         return vectors
 
@@ -164,7 +179,9 @@ class OllamaEmbedder(BaseEmbedder):
         )
         vector = response.get("embedding")
         if not isinstance(vector, list):
-            raise EmbeddingDependencyError("Invalid vector payload returned by Ollama /api/embeddings")
+            raise EmbeddingDependencyError(
+                "Invalid vector payload returned by Ollama /api/embeddings"
+            )
         return [float(value) for value in vector]
 
     def _set_dimension(self, vectors: Sequence[Sequence[float]]) -> None:

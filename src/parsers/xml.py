@@ -46,7 +46,9 @@ class XmlParser(BaseParser):
             "root_tag": self._tag_name(root.tag),
             "element_count": counters["elements"],
             "attribute_count": counters["attributes"],
-            "namespaces": {key or "default": value for key, value in (root.nsmap or {}).items()},
+            "namespaces": {
+                key or "default": value for key, value in (root.nsmap or {}).items()
+            },
         }
         return self._build_document(
             text="\n".join(output_lines),
@@ -66,7 +68,9 @@ class XmlParser(BaseParser):
 
         for attr_name, attr_value in element.attrib.items():
             counters["attributes"] += 1
-            output_lines.append(f"{element_path}@{self._tag_name(attr_name)}: {attr_value}")
+            output_lines.append(
+                f"{element_path}@{self._tag_name(attr_name)}: {attr_value}"
+            )
 
         if element.text and element.text.strip():
             output_lines.append(f"{element_path}: {element.text.strip()}")

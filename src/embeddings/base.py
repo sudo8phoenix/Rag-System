@@ -57,7 +57,8 @@ def cosine_similarity(left: Sequence[float], right: Sequence[float]) -> float:
         raise ValueError("Vectors must have the same dimension")
 
     dot_product = sum(
-        left_value * right_value for left_value, right_value in zip(left_values, right_values)
+        left_value * right_value
+        for left_value, right_value in zip(left_values, right_values)
     )
     left_norm = sqrt(sum(value * value for value in left_values))
     right_norm = sqrt(sum(value * value for value in right_values))

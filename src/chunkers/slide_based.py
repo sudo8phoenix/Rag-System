@@ -34,7 +34,9 @@ class SlideBasedChunker(BaseChunker):
             if not text:
                 continue
 
-            metadata = self._base_metadata(document, config, self.strategy_name, len(chunks))
+            metadata = self._base_metadata(
+                document, config, self.strategy_name, len(chunks)
+            )
             metadata.update(
                 {
                     "slide_number": number,
@@ -59,14 +61,18 @@ class SlideBasedChunker(BaseChunker):
         if isinstance(raw, list) and raw:
             return [item for item in raw if isinstance(item, dict)]
 
-        segments = re.split(r"\n\s*---\s*slide\s*---\s*\n", document.text, flags=re.IGNORECASE)
+        segments = re.split(
+            r"\n\s*---\s*slide\s*---\s*\n", document.text, flags=re.IGNORECASE
+        )
         slides: list[dict[str, object]] = []
         for index, segment in enumerate(segments, start=1):
             text = segment.strip()
             if not text:
                 continue
 
-            notes_match = re.split(r"\n\s*notes\s*:\s*", text, maxsplit=1, flags=re.IGNORECASE)
+            notes_match = re.split(
+                r"\n\s*notes\s*:\s*", text, maxsplit=1, flags=re.IGNORECASE
+            )
             body = notes_match[0].strip()
             notes = notes_match[1].strip() if len(notes_match) > 1 else ""
 
@@ -74,6 +80,8 @@ class SlideBasedChunker(BaseChunker):
             title = lines[0] if lines else f"Slide {index}"
             content = "\n".join(lines[1:]) if len(lines) > 1 else ""
 
-            slides.append({"number": index, "title": title, "content": content, "notes": notes})
+            slides.append(
+                {"number": index, "title": title, "content": content, "notes": notes}
+            )
 
         return slides

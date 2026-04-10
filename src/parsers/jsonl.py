@@ -32,7 +32,9 @@ class JsonlParser(BaseParser):
             try:
                 payload = json.loads(line)
             except json.JSONDecodeError as exc:
-                raise ParserError(f"Invalid JSONL at line {line_number} in {path}: {exc}") from exc
+                raise ParserError(
+                    f"Invalid JSONL at line {line_number} in {path}: {exc}"
+                ) from exc
 
             flattened: list[str] = []
             self._flatten(payload, "root", flattened)

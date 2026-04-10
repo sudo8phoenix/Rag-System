@@ -37,7 +37,9 @@ class KokoroTTS(BaseTTSBackend):
         mixer_module: Any | Callable[[], Any] | None = None,
         output_dir: str | Path | None = None,
     ) -> None:
-        super().__init__(config=config, mixer_module=mixer_module, output_dir=output_dir)
+        super().__init__(
+            config=config, mixer_module=mixer_module, output_dir=output_dir
+        )
         self._pipeline_factory = pipeline_factory or _default_kokoro_factory
         self._pipeline: Any | None = None
 
@@ -84,7 +86,9 @@ class KokoroTTS(BaseTTSBackend):
         frames = bytearray()
         for sample in self._iter_audio_samples(audio_chunks):
             value = max(-1.0, min(1.0, float(sample)))
-            frames.extend(int(value * 32767).to_bytes(2, byteorder="little", signed=True))
+            frames.extend(
+                int(value * 32767).to_bytes(2, byteorder="little", signed=True)
+            )
 
         with wave.open(str(path), "wb") as handle:
             handle.setnchannels(1)
@@ -92,14 +96,20 @@ class KokoroTTS(BaseTTSBackend):
             handle.setframerate(self.sample_rate)
             handle.writeframes(bytes(frames))
 
-    def synthesize_to_file(self, text: str, output_path: str | Path | None = None) -> Path:
+    def synthesize_to_file(
+        self, text: str, output_path: str | Path | None = None
+    ) -> Path:
         if not text or not text.strip():
             raise ValueError("text must not be empty")
 
         pipeline = self.load_engine()
         self._ensure_output_dir()
 
-        path = Path(output_path) if output_path is not None else self._default_output_path()
+        path = (
+            Path(output_path)
+            if output_path is not None
+            else self._default_output_path()
+        )
         audio_chunks: list[Any] = []
 
         try:

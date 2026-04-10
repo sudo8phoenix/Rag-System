@@ -24,10 +24,15 @@ class RowBasedChunker(BaseChunker):
             return []
 
         delimiter = self._resolve_delimiter(document, lines[0])
-        first_row = self._normalize_row(self._split_row(lines[0], delimiter), len(headers))
+        first_row = self._normalize_row(
+            self._split_row(lines[0], delimiter), len(headers)
+        )
         header_row = self._normalize_row(headers, len(headers))
         data_lines = lines[1:] if first_row == header_row else lines
-        rows = [self._normalize_row(self._split_row(line, delimiter), len(headers)) for line in data_lines]
+        rows = [
+            self._normalize_row(self._split_row(line, delimiter), len(headers))
+            for line in data_lines
+        ]
 
         rows_per_chunk = max(1, config.rows_per_chunk)
         chunks: list[Chunk] = []
@@ -38,10 +43,14 @@ class RowBasedChunker(BaseChunker):
             if not row_block:
                 continue
 
-            rendered_rows = [" | ".join(headers)] + [" | ".join(row) for row in row_block]
+            rendered_rows = [" | ".join(headers)] + [
+                " | ".join(row) for row in row_block
+            ]
             text = "\n".join(rendered_rows).strip()
 
-            metadata = self._base_metadata(document, config, self.strategy_name, len(chunks))
+            metadata = self._base_metadata(
+                document, config, self.strategy_name, len(chunks)
+            )
             metadata.update(
                 {
                     "headers": headers,

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 import logging
+import inspect
+from datetime import datetime, timezone
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Iterable, Sequence
@@ -70,8 +72,8 @@ class PipelineOrchestrator:
         self.config = config or AppConfig()
         self.parser_registry = parser_registry or ParserRegistry()
         self.chunking_registry = chunking_registry or ChunkingRegistry(self.config)
-        self.embedding_orchestrator = embedding_orchestrator or EmbeddingOrchestrator.from_config(
-            self.config
+        self.embedding_orchestrator = (
+            embedding_orchestrator or EmbeddingOrchestrator.from_config(self.config)
         )
         self.llm = llm or self._build_llm_from_config(self.config)
         self.tts = tts or TTSOrchestrator.from_app_config(self.config)
@@ -102,7 +104,9 @@ class PipelineOrchestrator:
         }
         self.logger.log(level, json.dumps(record, default=str, sort_keys=True))
 
-    def _iter_source_paths(self, source_paths: Sequence[str | Path] | None) -> Iterable[Path]:
+    def _iter_source_paths(
+        self, source_paths: Sequence[str | Path] | None
+    ) -> Iterable[Path]:
         if not source_paths:
             return []
         return (Path(source_path) for source_path in source_paths)
@@ -119,7 +123,22 @@ class PipelineOrchestrator:
                 document = self.parser_registry.parse_file(source_path)
                 document_chunks = self.chunking_registry.chunk_document(document)
                 if document_chunks:
-                    self.embedding_orchestrator.index_chunks(document_chunks)
+                    chunk_metadata = [
+                        {
+                            "source_path": str(source_path),
+                            "ingested_at": datetime.now(timezone.utc).isoformat(),
+                        }
+                        for _ in document_chunks
+                    ]
+                    index_chunks = self.embedding_orchestrator.index_chunks
+                    parameters = inspect.signature(index_chunks).parameters
+                    if "metadata" in parameters or any(
+                        parameter.kind == inspect.Parameter.VAR_KEYWORD
+                        for parameter in parameters.values()
+                    ):
+                        index_chunks(document_chunks, metadata=chunk_metadata)
+                    else:
+                        index_chunks(document_chunks)
                 documents.append(document)
                 chunks.extend(document_chunks)
                 self._log_event(
@@ -129,7 +148,9 @@ class PipelineOrchestrator:
                     path=str(source_path),
                     chunks=len(document_chunks),
                 )
-            except Exception as exc:  # pragma: no cover - exercised through pipeline tests
+            except (
+                Exception
+            ) as exc:  # pragma: no cover - exercised through pipeline tests
                 error_info = {
                     "path": str(source_path),
                     "error": str(exc),
@@ -168,7 +189,9 @@ class PipelineOrchestrator:
             raise ValueError("voice input did not produce a transcribed query")
         return voice_result.text.strip(), voice_result
 
-    def _build_context_items(self, retrieved_chunks: Sequence[Any]) -> list[dict[str, Any]]:
+    def _build_context_items(
+        self, retrieved_chunks: Sequence[Any]
+    ) -> list[dict[str, Any]]:
         context_items: list[dict[str, Any]] = []
         for result in retrieved_chunks:
             chunk = getattr(result, "chunk", None)
@@ -189,7 +212,9 @@ class PipelineOrchestrator:
             )
         return context_items
 
-    def _serialize_documents(self, documents: Sequence[Document]) -> list[dict[str, Any]]:
+    def _serialize_documents(
+        self, documents: Sequence[Document]
+    ) -> list[dict[str, Any]]:
         return [document.to_dict() for document in documents]
 
     def _serialize_chunks(self, chunks: Sequence[Chunk]) -> list[dict[str, Any]]:
@@ -347,7 +372,9 @@ class PipelineOrchestrator:
             )
         else:
             try:
-                tts_result = self.tts.speak(response_text, output_path=output_path, block=block)
+                tts_result = self.tts.speak(
+                    response_text, output_path=output_path, block=block
+                )
                 audio_path = tts_result.audio_path
                 audio_played = tts_result.played
                 self._log_event(

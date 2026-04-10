@@ -75,7 +75,9 @@ class ParserRegistry:
         legacy_target = get_legacy_conversion_target(path.suffix.lower())
         if legacy_target:
             try:
-                converted_document = self._parse_via_legacy_conversion(path, legacy_target)
+                converted_document = self._parse_via_legacy_conversion(
+                    path, legacy_target
+                )
                 converted_metadata = dict(converted_document.original_metadata)
                 converted_metadata.update(
                     {
@@ -90,7 +92,8 @@ class ParserRegistry:
                 return Document(
                     text=converted_document.text,
                     filename=path.name,
-                    source_type=path.suffix.lstrip(".").lower() or converted_document.source_type,
+                    source_type=path.suffix.lstrip(".").lower()
+                    or converted_document.source_type,
                     original_metadata=converted_metadata,
                 )
             except ParserError as exc:
@@ -134,7 +137,9 @@ class ParserRegistry:
             original_metadata=metadata,
         )
 
-    def _parse_via_legacy_conversion(self, source_path: Path, target_extension: str) -> Document:
+    def _parse_via_legacy_conversion(
+        self, source_path: Path, target_extension: str
+    ) -> Document:
         """Convert a legacy file to a modern format and parse it with the converted parser."""
 
         with temporary_converted_file(

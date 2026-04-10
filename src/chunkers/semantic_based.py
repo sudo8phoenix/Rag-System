@@ -69,9 +69,7 @@ class SemanticBasedChunker(BaseChunker):
         )
 
         # Build chunks respecting breakpoints and size constraints
-        chunks = self._build_chunks(
-            sentences, breakpoints, document, config
-        )
+        chunks = self._build_chunks(sentences, breakpoints, document, config)
 
         return chunks
 
@@ -115,7 +113,7 @@ class SemanticBasedChunker(BaseChunker):
         """
         if len(embeddings) == 0:
             return []
-        
+
         if len(embeddings) == 1:
             return [0]  # Always start with first sentence
 
@@ -205,11 +203,13 @@ class SemanticBasedChunker(BaseChunker):
                         metadata = self._base_metadata(
                             document, config, self.strategy_name, chunk_index
                         )
-                        metadata.update({
-                            "sentence_start": start_idx,
-                            "sentence_end": j,
-                            "sentence_count": len(chunk_sentences),
-                        })
+                        metadata.update(
+                            {
+                                "sentence_start": start_idx,
+                                "sentence_end": j,
+                                "sentence_count": len(chunk_sentences),
+                            }
+                        )
                         chunks.append(
                             self._build_chunk(
                                 text=chunk_text,
@@ -227,16 +227,21 @@ class SemanticBasedChunker(BaseChunker):
                     current_size = len(prospective_text)
 
             # Save remaining chunk
-            if chunk_sentences and len(" ".join(chunk_sentences)) >= config.min_chunk_size:
+            if (
+                chunk_sentences
+                and len(" ".join(chunk_sentences)) >= config.min_chunk_size
+            ):
                 chunk_text = " ".join(chunk_sentences)
                 metadata = self._base_metadata(
                     document, config, self.strategy_name, chunk_index
                 )
-                metadata.update({
-                    "sentence_start": start_idx,
-                    "sentence_end": end_idx,
-                    "sentence_count": len(chunk_sentences),
-                })
+                metadata.update(
+                    {
+                        "sentence_start": start_idx,
+                        "sentence_end": end_idx,
+                        "sentence_count": len(chunk_sentences),
+                    }
+                )
                 chunks.append(
                     self._build_chunk(
                         text=chunk_text,

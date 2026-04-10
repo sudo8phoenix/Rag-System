@@ -28,7 +28,9 @@ class ChapterBasedChunker(BaseChunker):
                 continue
 
             text = f"{title}\n\n{content}".strip()
-            metadata = self._base_metadata(document, config, self.strategy_name, len(chunks))
+            metadata = self._base_metadata(
+                document, config, self.strategy_name, len(chunks)
+            )
             metadata.update(
                 {
                     "chapter_title": title,
@@ -62,7 +64,11 @@ class ChapterBasedChunker(BaseChunker):
             number = int(match.group(1))
             title = f"Chapter {number}: {match.group(2).strip()}"
             start = match.end()
-            end = matches[idx + 1].start() if idx + 1 < len(matches) else len(document.text)
+            end = (
+                matches[idx + 1].start()
+                if idx + 1 < len(matches)
+                else len(document.text)
+            )
             content = document.text[start:end].strip()
             chapters.append({"number": number, "title": title, "content": content})
 

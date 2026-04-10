@@ -59,7 +59,9 @@ class Pyttsx3TTS(BaseTTSBackend):
         mixer_module: Any | Callable[[], Any] | None = None,
         output_dir: str | Path | None = None,
     ) -> None:
-        super().__init__(config=config, mixer_module=mixer_module, output_dir=output_dir)
+        super().__init__(
+            config=config, mixer_module=mixer_module, output_dir=output_dir
+        )
         self._engine_factory = engine_factory or _default_engine_factory
         self._engine: Any | None = None
 
@@ -139,10 +141,15 @@ class Pyttsx3TTS(BaseTTSBackend):
         except OSError:
             return False
 
-        return len(header) >= 12 and header[:4] == b"FORM" and header[8:12] in {
-            b"AIFF",
-            b"AIFC",
-        }
+        return (
+            len(header) >= 12
+            and header[:4] == b"FORM"
+            and header[8:12]
+            in {
+                b"AIFF",
+                b"AIFC",
+            }
+        )
 
     def _convert_aiff_to_wav(self, path: Path) -> None:
         """Use macOS afconvert to produce a browser-decodable PCM WAV file."""
@@ -180,12 +187,18 @@ class Pyttsx3TTS(BaseTTSBackend):
         except wave.Error:
             return True
 
-    def synthesize_to_file(self, text: str, output_path: str | Path | None = None) -> Path:
+    def synthesize_to_file(
+        self, text: str, output_path: str | Path | None = None
+    ) -> Path:
         if not text or not text.strip():
             raise ValueError("text must not be empty")
 
         self._ensure_output_dir()
-        path = Path(output_path) if output_path is not None else self._default_output_path()
+        path = (
+            Path(output_path)
+            if output_path is not None
+            else self._default_output_path()
+        )
 
         for attempt in range(4):
             engine = self._create_configured_engine()

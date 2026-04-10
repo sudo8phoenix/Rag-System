@@ -4,7 +4,14 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import (
+    AliasChoices,
+    BaseModel,
+    ConfigDict,
+    Field,
+    field_validator,
+    model_validator,
+)
 
 
 class VoiceConfig(BaseModel):
@@ -98,7 +105,9 @@ class ChunkingConfig(BaseModel):
         if self.chunk_overlap >= self.chunk_size:
             raise ValueError("chunk_overlap must be smaller than chunk_size")
         if self.min_chunk_size > self.max_chunk_size:
-            raise ValueError("min_chunk_size must be less than or equal to max_chunk_size")
+            raise ValueError(
+                "min_chunk_size must be less than or equal to max_chunk_size"
+            )
         return self
 
     def effective_for_format(self, source_type: str | None) -> "ChunkingConfig":

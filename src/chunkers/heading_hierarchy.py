@@ -59,7 +59,9 @@ class HeadingHierarchyChunker(BaseChunker):
                 continue
 
             path = contexts[index]
-            metadata = self._base_metadata(document, config, self.strategy_name, len(chunks))
+            metadata = self._base_metadata(
+                document, config, self.strategy_name, len(chunks)
+            )
             metadata.update(
                 {
                     "heading": heading.text,
@@ -105,7 +107,9 @@ class HeadingHierarchyChunker(BaseChunker):
 
             if expected_queue and line == expected_queue[0][0]:
                 heading_text, heading_level = expected_queue.pop(0)
-                headings.append(_Heading(line_index=index, level=heading_level, text=heading_text))
+                headings.append(
+                    _Heading(line_index=index, level=heading_level, text=heading_text)
+                )
                 continue
 
             parsed = self._parse_heading_line(line)
@@ -133,7 +137,9 @@ class HeadingHierarchyChunker(BaseChunker):
             level = numbered.group(1).count(".") + 1
             return min(level, 3), numbered.group(2).strip()
 
-        title = re.match(r"^(chapter|section)\s+\d+[:\.-]?\s+(.+)$", line, re.IGNORECASE)
+        title = re.match(
+            r"^(chapter|section)\s+\d+[:\.-]?\s+(.+)$", line, re.IGNORECASE
+        )
         if title:
             keyword = title.group(1).lower()
             return (1 if keyword == "chapter" else 2), title.group(2).strip()

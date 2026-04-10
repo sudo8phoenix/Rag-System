@@ -21,7 +21,9 @@ HttpPostJsonStream = Callable[[str, JSONDict, float], Iterator[JSONDict]]
 
 def _http_get_json(url: str, timeout: float) -> JSONDict:
     req = request.Request(url=url, method="GET")
-    with request.urlopen(req, timeout=timeout) as response:  # noqa: S310 - trusted local endpoint
+    with request.urlopen(
+        req, timeout=timeout
+    ) as response:  # noqa: S310 - trusted local endpoint
         payload = response.read().decode("utf-8")
     return json.loads(payload) if payload else {}
 
@@ -34,12 +36,16 @@ def _http_post_json(url: str, payload: JSONDict, timeout: float) -> JSONDict:
         method="POST",
         headers={"Content-Type": "application/json"},
     )
-    with request.urlopen(req, timeout=timeout) as response:  # noqa: S310 - trusted local endpoint
+    with request.urlopen(
+        req, timeout=timeout
+    ) as response:  # noqa: S310 - trusted local endpoint
         body = response.read().decode("utf-8")
     return json.loads(body) if body else {}
 
 
-def _http_post_json_stream(url: str, payload: JSONDict, timeout: float) -> Iterator[JSONDict]:
+def _http_post_json_stream(
+    url: str, payload: JSONDict, timeout: float
+) -> Iterator[JSONDict]:
     data = json.dumps(payload).encode("utf-8")
     req = request.Request(
         url=url,
@@ -47,7 +53,9 @@ def _http_post_json_stream(url: str, payload: JSONDict, timeout: float) -> Itera
         method="POST",
         headers={"Content-Type": "application/json"},
     )
-    with request.urlopen(req, timeout=timeout) as response:  # noqa: S310 - trusted local endpoint
+    with request.urlopen(
+        req, timeout=timeout
+    ) as response:  # noqa: S310 - trusted local endpoint
         for line in response:
             if not line:
                 continue
@@ -105,14 +113,18 @@ class OllamaLLM:
         try:
             return self._http_post_json(url, payload, self.timeout_seconds)
         except (error.URLError, TimeoutError, OSError, json.JSONDecodeError) as exc:
-            raise LLMProviderError(f"Ollama request failed for {endpoint}: {exc}") from exc
+            raise LLMProviderError(
+                f"Ollama request failed for {endpoint}: {exc}"
+            ) from exc
 
     def _post_stream(self, endpoint: str, payload: JSONDict) -> Iterator[JSONDict]:
         url = f"{self.base_url}{endpoint}"
         try:
             yield from self._http_post_json_stream(url, payload, self.timeout_seconds)
         except (error.URLError, TimeoutError, OSError, json.JSONDecodeError) as exc:
-            raise LLMProviderError(f"Ollama streaming request failed for {endpoint}: {exc}") from exc
+            raise LLMProviderError(
+                f"Ollama streaming request failed for {endpoint}: {exc}"
+            ) from exc
 
     def list_models(self) -> list[str]:
         """Return locally available Ollama model names."""
@@ -128,7 +140,9 @@ class OllamaLLM:
     def pull_model(self, model_name: str | None = None) -> None:
         """Pull a model into local Ollama cache."""
 
-        self._post("/api/pull", {"name": model_name or self.config.model, "stream": False})
+        self._post(
+            "/api/pull", {"name": model_name or self.config.model, "stream": False}
+        )
 
     def check_status(self) -> OllamaStatus:
         """Check endpoint reachability and whether configured model is available."""
@@ -198,7 +212,9 @@ class OllamaLLM:
             text=text,
             model=str(result.get("model", self.config.model)),
             prompt=payload["prompt"],
-            done_reason=str(result.get("done_reason")) if result.get("done_reason") else None,
+            done_reason=(
+                str(result.get("done_reason")) if result.get("done_reason") else None
+            ),
             raw=result,
         )
 

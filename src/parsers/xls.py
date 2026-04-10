@@ -38,7 +38,9 @@ class XlsParser(BaseParser):
             extraction_method = "libreoffice-to-xlsx"
             metadata["xlrd_error"] = str(exc)
 
-        metadata.update({"format": self.source_type, "extraction_method": extraction_method})
+        metadata.update(
+            {"format": self.source_type, "extraction_method": extraction_method}
+        )
         return self._build_document(
             text=text,
             file_path=path,
@@ -53,14 +55,19 @@ class XlsParser(BaseParser):
         try:
             workbook = xlrd.open_workbook(str(file_path), on_demand=True)
         except Exception as exc:  # pragma: no cover - backend exceptions vary
-            raise ParserError(f"Unable to open XLS workbook {file_path}: {exc}") from exc
+            raise ParserError(
+                f"Unable to open XLS workbook {file_path}: {exc}"
+            ) from exc
 
         output_lines: list[str] = []
         sheet_metadata: list[dict[str, Any]] = []
         for sheet in workbook.sheets():
             rows: list[list[str]] = []
             for row_index in range(sheet.nrows):
-                row_values = [self._format_cell(sheet.cell_value(row_index, col)) for col in range(sheet.ncols)]
+                row_values = [
+                    self._format_cell(sheet.cell_value(row_index, col))
+                    for col in range(sheet.ncols)
+                ]
                 if any(value.strip() for value in row_values):
                     rows.append(row_values)
 

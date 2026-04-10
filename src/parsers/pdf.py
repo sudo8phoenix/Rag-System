@@ -20,7 +20,6 @@ except ImportError:  # pragma: no cover - optional dependency
 
 from .base import BaseParser, ParserError
 
-
 OBJECT_RE = re.compile(r"(?ms)^(\d+)\s+(\d+)\s+obj\s*(.*?)\s*endobj\s*$")
 STREAM_RE = re.compile(r"(?ms)stream\s*(.*?)\s*endstream")
 LITERAL_STRING_RE = re.compile(r"\((?:\\.|[^\\)])*\)")
@@ -141,7 +140,9 @@ class PdfParser(BaseParser):
                                 "rows": normalized_rows,
                                 "csv_lines": self._to_csv_lines(normalized_rows),
                                 "row_count": len(normalized_rows),
-                                "column_count": max((len(row) for row in normalized_rows), default=0),
+                                "column_count": max(
+                                    (len(row) for row in normalized_rows), default=0
+                                ),
                                 "bbox": self._format_bbox(bbox),
                             }
                         )
@@ -226,10 +227,14 @@ class PdfParser(BaseParser):
                 extracted_parts.extend(self._extract_pdf_strings(stream_text))
 
             if extracted_parts:
-                page_text = "\n".join(part.strip() for part in extracted_parts if part.strip())
+                page_text = "\n".join(
+                    part.strip() for part in extracted_parts if part.strip()
+                )
                 if page_text:
                     page_texts.append(page_text)
-                    page_details.append({"page": len(page_details) + 1, "text_length": len(page_text)})
+                    page_details.append(
+                        {"page": len(page_details) + 1, "text_length": len(page_text)}
+                    )
 
         if not page_texts:
             fallback_strings = self._extract_pdf_strings(text)
@@ -261,7 +266,9 @@ class PdfParser(BaseParser):
         if not array_match:
             return []
 
-        return [int(ref) for ref in re.findall(r"(\d+)\s+\d+\s+R", array_match.group(1))]
+        return [
+            int(ref) for ref in re.findall(r"(\d+)\s+\d+\s+R", array_match.group(1))
+        ]
 
     def _extract_stream_text(self, body: str) -> str:
         match = STREAM_RE.search(body)
@@ -284,7 +291,10 @@ class PdfParser(BaseParser):
         if strings:
             return strings
 
-        return [self._unescape_pdf_string(literal[1:-1]) for literal in LITERAL_STRING_RE.findall(text)]
+        return [
+            self._unescape_pdf_string(literal[1:-1])
+            for literal in LITERAL_STRING_RE.findall(text)
+        ]
 
     def _unescape_pdf_string(self, value: str) -> str:
         replacements = {

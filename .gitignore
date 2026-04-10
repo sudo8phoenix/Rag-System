@@ -25,10 +25,5 @@ data/
 data/chroma_db/
 data/tts/*.wav
 
-# Markdown files
-*.md
-!README.md
-!tests/**/*.md
-
 # Unit tests
 tests/
